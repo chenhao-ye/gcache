@@ -3,6 +3,7 @@
  */
 #pragma once
 
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -10,6 +11,9 @@
 #include "handle.h"
 
 namespace gcache {
+
+template <typename Key_t, typename Value_t>
+class LRUCache;
 
 // We provide our own simple hash table since it removes a whole bunch
 // of porting hacks and is also faster than some of the built-in hash
@@ -21,31 +25,31 @@ class HandleTable {
  public:
   typedef LRUHandle<Key_t, Value_t> Handle_t;
 
-  HandleTable() : length_(0), elems_(0), list_(nullptr) { resize(); }
+  HandleTable() : length_(0), list_(nullptr) {}
   ~HandleTable() { delete[] list_; }
 
   Handle_t* lookup(Key_t key, uint32_t hash);
-  Handle_t* insert(Handle_t* h);
   Handle_t* remove(Key_t key, uint32_t hash);
+  void reserve(size_t size);  // size must be 2^n
+  // insertion requires a handle allocator and thus not provided as a built-in
+  // API. Please build it on LRUCache with find_pointer().
 
  private:
-  // The table consists of an array of buckets where each bucket is
-  // a linked list of cache entries that hash into the bucket.
-  uint32_t length_;
-  uint32_t elems_;
-  Handle_t** list_;
-
   // Return a pointer to slot that points to a cache entry that
   // matches key/hash.  If there is no such cache entry, return a
   // pointer to the trailing slot in the corresponding linked list.
   Handle_t** find_pointer(Key_t key, uint32_t hash);
-  void resize();
+
+  // The table consists of an array of buckets where each bucket is
+  // a linked list of cache entries that hash into the bucket.
+  uint32_t length_;
+  Handle_t** list_;
+
+  friend class LRUCache<Key_t, Value_t>;
 
  public:  // for debugging
   friend std::ostream& operator<<(std::ostream& os, const HandleTable& ht) {
-    os << "HandleTable (length=" << ht.length_ << ", elems=" << ht.elems_
-       << ") {\n";
-
+    os << "HandleTable (length=" << ht.length_ << ") {\n";
     for (size_t i = 0; i < ht.length_; ++i) {
       auto h = ht.list_[i];
       if (!h) continue;
@@ -64,35 +68,18 @@ class HandleTable {
 template <typename Key_t, typename Value_t>
 typename HandleTable<Key_t, Value_t>::Handle_t*
 HandleTable<Key_t, Value_t>::lookup(Key_t key, uint32_t hash) {
+  assert(length_ > 0);
   return *find_pointer(key, hash);
 }
 
 template <typename Key_t, typename Value_t>
 typename HandleTable<Key_t, Value_t>::Handle_t*
-HandleTable<Key_t, Value_t>::insert(Handle_t* h) {
-  Handle_t** ptr = find_pointer(h->key, h->hash);
-  Handle_t* old = *ptr;
-  h->next_hash = (old == nullptr ? nullptr : old->next_hash);
-  *ptr = h;
-  if (old == nullptr) {
-    ++elems_;
-    if (elems_ > length_) {
-      // Since each cache entry is fairly large, we aim for a small
-      // average linked list length (<= 1).
-      resize();
-    }
-  }
-  return old;
-}
-
-template <typename Key_t, typename Value_t>
-typename HandleTable<Key_t, Value_t>::Handle_t*
 HandleTable<Key_t, Value_t>::remove(Key_t key, uint32_t hash) {
+  assert(length_ > 0);
   Handle_t** ptr = find_pointer(key, hash);
   Handle_t* result = *ptr;
   if (result != nullptr) {
     *ptr = result->next_hash;
-    --elems_;
   }
   return result;
 }
@@ -111,28 +98,11 @@ HandleTable<Key_t, Value_t>::find_pointer(Key_t key, uint32_t hash) {
 }
 
 template <typename Key_t, typename Value_t>
-void HandleTable<Key_t, Value_t>::resize() {
-  uint32_t new_length = 4;
-  while (new_length < elems_) new_length *= 2;
-  Handle_t** new_list = new Handle_t*[new_length];
-  memset(new_list, 0, sizeof(new_list[0]) * new_length);
-  uint32_t count = 0;
-  for (uint32_t i = 0; i < length_; i++) {
-    Handle_t* h = list_[i];
-    while (h != nullptr) {
-      Handle_t* next = h->next_hash;
-      uint32_t hash = h->hash;
-      Handle_t** ptr = &new_list[hash & (new_length - 1)];
-      h->next_hash = *ptr;
-      *ptr = h;
-      h = next;
-      count++;
-    }
-  }
-  assert(elems_ == count);
-  delete[] list_;
-  list_ = new_list;
-  length_ = new_length;
+void HandleTable<Key_t, Value_t>::reserve(size_t size) {
+  size = std::bit_ceil<size_t>(size);
+  length_ = size;
+  list_ = new Handle_t*[length_];
+  memset(list_, 0, sizeof(list_[0]) * length_);
 }
 
 }  // namespace gcache

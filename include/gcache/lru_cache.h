@@ -18,7 +18,7 @@ namespace gcache {
 template <typename Key_t, typename Value_t>
 class LRUCache {
  public:
-  typedef typename HandleTable<Key_t, Value_t>::Handle_t Handle_t;
+  typedef LRUHandle<Key_t, Value_t> Handle_t;
   LRUCache();
   LRUCache(size_t capacity) : LRUCache() { init_pool(capacity); };
   ~LRUCache();
@@ -26,12 +26,17 @@ class LRUCache {
   LRUCache(LRUCache&&) = delete;
   LRUCache& operator=(const LRUCache&) = delete;
   LRUCache& operator=(LRUCache&&) = delete;
-
-  Handle_t* insert(Key_t key, uint32_t hash);
-  Handle_t* lookup(Key_t key, uint32_t hash);
-  void release(Handle_t* handle);
-  void erase(Key_t key, uint32_t hash);
   void init_pool(size_t capacity);
+
+  // Insert a handle into cache with giveb key and hash if not exists; if does,
+  // return the existing one
+  // Returned handle must be released
+  Handle_t* insert(Key_t key, uint32_t hash);
+  // Search for a handle; return nullptr if not exist
+  // Returned handle must be release
+  Handle_t* lookup(Key_t key, uint32_t hash);
+  // Release handle returned by insert/lookup
+  void release(Handle_t* handle);
 
  private:
   Handle_t* alloc_handle();
@@ -39,8 +44,7 @@ class LRUCache {
   void list_remove(Handle_t* e);
   void list_append(Handle_t* list, Handle_t* e);
   void ref(Handle_t* e);
-  void unref(Handle_t* e, bool in_cache = true);
-  bool finish_erase(Handle_t* e);
+  void unref(Handle_t* e);
 
   // Initialized before use.
   size_t capacity_;
@@ -99,7 +103,7 @@ class LRUCache {
 };
 
 template <typename Key_t, typename Value_t>
-LRUCache<Key_t, Value_t>::LRUCache() : capacity_(0), pool_(nullptr) {
+LRUCache<Key_t, Value_t>::LRUCache() : capacity_(0), pool_(nullptr), table_() {
   // Make empty circular linked lists.
   lru_.next = &lru_;
   lru_.prev = &lru_;
@@ -123,12 +127,21 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   // Disable support for capacity_ == 0; the user must set capacity first
   assert(capacity_ > 0 && pool_);
 
-  Handle_t* e = alloc_handle();
-  if (!e) return e;  // Fail to allocate a new handle
+  // Search to see if already exists
+  Handle_t** ptr = table_.find_pointer(key, hash);
+  Handle_t* e = *ptr;
+  if (e) goto done;
+
+  // Allocate a new handle
+  e = alloc_handle();
+  if (!e) return nullptr;
   e->init(key, hash);
-  e->refs++;  // for the cache's reference.
-  list_append(&in_use_, e);
-  finish_erase(table_.insert(e));
+  e->next_hash = nullptr;
+  *ptr = e;
+
+done:
+  e->refs++;
+  if (e->refs == 2) list_append(&in_use_, e);
   return e;
 }
 
@@ -146,11 +159,6 @@ void LRUCache<Key_t, Value_t>::release(Handle_t* handle) {
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::erase(Key_t key, uint32_t hash) {
-  finish_erase(table_.remove(key, hash));
-}
-
-template <typename Key_t, typename Value_t>
 void LRUCache<Key_t, Value_t>::init_pool(size_t capacity) {
   assert(!capacity_ && !pool_);
   assert(capacity);
@@ -165,6 +173,7 @@ void LRUCache<Key_t, Value_t>::init_pool(size_t capacity) {
     pool_[i].next = &pool_[i + 1];
     pool_[i + 1].prev = &pool_[i];
   }
+  table_.reserve(capacity);
 }
 
 template <typename Key_t, typename Value_t>
@@ -202,12 +211,12 @@ void LRUCache<Key_t, Value_t>::ref(Handle_t* e) {
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::unref(Handle_t* e, bool in_cache) {
+void LRUCache<Key_t, Value_t>::unref(Handle_t* e) {
   assert(e->refs > 0);
   e->refs--;
   if (e->refs == 0) {  // Deallocate.
     free_handle(e);
-  } else if (e->refs == 1 && in_cache) {
+  } else if (e->refs == 1) {
     // No longer in use; move to lru_ list.
     list_remove(e);
     list_append(&lru_, e);
@@ -227,16 +236,6 @@ void LRUCache<Key_t, Value_t>::list_append(Handle_t* list, Handle_t* e) {
   e->prev = list->prev;
   e->prev->next = e;
   e->next->prev = e;
-}
-
-// If e != nullptr, finish removing *e from the cache; it has already been
-// removed from the hash table.  Return whether e != nullptr.
-template <typename Key_t, typename Value_t>
-bool LRUCache<Key_t, Value_t>::finish_erase(Handle_t* e) {
-  if (!e) return false;
-  list_remove(e);
-  unref(e, false);
-  return true;
 }
 
 }  // namespace gcache

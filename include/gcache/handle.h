@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iostream>
 
 namespace gcache {
 // LRU cache implementation
@@ -28,14 +29,24 @@ namespace gcache {
 // An entry is a variable length heap-allocated structure.  Entries
 // are kept in a circular doubly linked list ordered by access time.
 template <typename Key_t, typename Value_t>
-class LRUHandle {
+struct LRUHandle {
   LRUHandle* next_hash;
   LRUHandle* next;
   LRUHandle* prev;
   uint32_t refs;  // References, including cache reference, if present.
-  uint32_t hash;  // Hash of key(); used for fast sharding and comparisons
-  bool in_cache;  // Whether entry is in the cache.
+  uint32_t hash;  // Hash of key; used for fast sharding and comparisons
   Key_t key;
   Value_t value;
+
+  void init(Key_t key, uint32_t hash) {
+    this->refs = 1;
+    this->hash = hash;
+    this->key = key;
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const LRUHandle& h) {
+    return os << h.key << ": " << h.value << " (refs=" << h.refs
+              << ", hash=" << h.hash << ")";
+  }
 };
 }  // namespace gcache

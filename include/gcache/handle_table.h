@@ -3,8 +3,11 @@
  */
 #pragma once
 
-#include "handle.h"
 #include <cstdint>
+#include <cstring>
+#include <iostream>
+
+#include "handle.h"
 
 namespace gcache {
 
@@ -37,6 +40,25 @@ class HandleTable {
   // pointer to the trailing slot in the corresponding linked list.
   Handle_t** find_pointer(Key_t key, uint32_t hash);
   void resize();
+
+ public:  // for debugging
+  friend std::ostream& operator<<(std::ostream& os, const HandleTable& ht) {
+    os << "HandleTable (length=" << ht.length_ << ", elems=" << ht.elems_
+       << ") {\n";
+
+    for (size_t i = 0; i < ht.length_; ++i) {
+      auto h = ht.list_[i];
+      if (!h) continue;
+      while (h) {
+        os << '\t' << *h << ';';
+        h = h->next_hash;
+        if (i > 10) exit(0);
+      }
+      os << '\n';
+    }
+    os << "}\n";
+    return os;
+  }
 };
 
 template <typename Key_t, typename Value_t>
@@ -91,9 +113,7 @@ HandleTable<Key_t, Value_t>::find_pointer(Key_t key, uint32_t hash) {
 template <typename Key_t, typename Value_t>
 void HandleTable<Key_t, Value_t>::resize() {
   uint32_t new_length = 4;
-  while (new_length < elems_) {
-    new_length *= 2;
-  }
+  while (new_length < elems_) new_length *= 2;
   Handle_t** new_list = new Handle_t*[new_length];
   memset(new_list, 0, sizeof(new_list[0]) * new_length);
   uint32_t count = 0;

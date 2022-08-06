@@ -39,7 +39,7 @@ class LRUCache {
   void list_remove(Handle_t* e);
   void list_append(Handle_t* list, Handle_t* e);
   void ref(Handle_t* e);
-  void unref(Handle_t* e);
+  void unref(Handle_t* e, bool in_cache = true);
   bool finish_erase(Handle_t* e);
 
   // Initialized before use.
@@ -202,12 +202,12 @@ void LRUCache<Key_t, Value_t>::ref(Handle_t* e) {
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::unref(Handle_t* e) {
+void LRUCache<Key_t, Value_t>::unref(Handle_t* e, bool in_cache) {
   assert(e->refs > 0);
   e->refs--;
   if (e->refs == 0) {  // Deallocate.
     free_handle(e);
-  } else if (e->refs == 1) {
+  } else if (e->refs == 1 && in_cache) {
     // No longer in use; move to lru_ list.
     list_remove(e);
     list_append(&lru_, e);
@@ -235,7 +235,7 @@ template <typename Key_t, typename Value_t>
 bool LRUCache<Key_t, Value_t>::finish_erase(Handle_t* e) {
   if (!e) return false;
   list_remove(e);
-  unref(e);
+  unref(e, false);
   return true;
 }
 

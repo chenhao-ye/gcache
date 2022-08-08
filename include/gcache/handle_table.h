@@ -22,7 +22,6 @@ class LRUCache;
 // 4.4.3's builtin hashtable.
 template <typename Key_t, typename Value_t>
 class HandleTable {
- public:
   typedef LRUHandle<Key_t, Value_t> Handle_t;
 
   HandleTable() : length_(0), list_(nullptr) {}
@@ -34,7 +33,6 @@ class HandleTable {
   // insertion requires a handle allocator and thus not provided as a built-in
   // API. Please build it on LRUCache with find_pointer().
 
- private:
   // Return a pointer to slot that points to a cache entry that
   // matches key/hash.  If there is no such cache entry, return a
   // pointer to the trailing slot in the corresponding linked list.
@@ -48,21 +46,7 @@ class HandleTable {
   friend class LRUCache<Key_t, Value_t>;
 
  public:  // for debugging
-  friend std::ostream& operator<<(std::ostream& os, const HandleTable& ht) {
-    os << "HandleTable (length=" << ht.length_ << ") {\n";
-    for (size_t i = 0; i < ht.length_; ++i) {
-      auto h = ht.list_[i];
-      if (!h) continue;
-      while (h) {
-        os << '\t' << *h << ';';
-        h = h->next_hash;
-        if (i > 10) exit(0);
-      }
-      os << '\n';
-    }
-    os << "}\n";
-    return os;
-  }
+  std::ostream& print(std::ostream& os, int indent = 0) const;
 };
 
 template <typename Key_t, typename Value_t>
@@ -103,6 +87,20 @@ void HandleTable<Key_t, Value_t>::reserve(size_t size) {
   length_ = size;
   list_ = new Handle_t*[length_];
   memset(list_, 0, sizeof(list_[0]) * length_);
+}
+
+template <typename Key_t, typename Value_t>
+std::ostream& HandleTable<Key_t, Value_t>::print(std::ostream& os,
+                                                 int indent) const {
+  os << "HandleTable (length=" << length_ << ") {\n";
+  for (size_t i = 0; i < length_; ++i) {
+    auto h = list_[i];
+    if (!h) continue;
+    for (int j = 0; j < indent; ++j) os << '\t';
+    h->print_list_hash(os);
+  }
+  os << "}\n";
+  return os;
 }
 
 }  // namespace gcache

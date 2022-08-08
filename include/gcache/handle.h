@@ -26,14 +26,25 @@ namespace gcache {
 // when they detect an element in the cache acquiring or losing its only
 // external reference.
 
+template <typename Key_t, typename Value_t>
+class HandleTable;
+template <typename Key_t, typename Value_t>
+class LRUCache;
+
 // An entry is a variable length heap-allocated structure.  Entries
 // are kept in a circular doubly linked list ordered by access time.
 template <typename Key_t, typename Value_t>
-struct LRUHandle {
+class LRUHandle {
+ private:
   LRUHandle* next_hash;
   LRUHandle* next;
   LRUHandle* prev;
   uint32_t refs;  // References, including cache reference, if present.
+
+  friend class HandleTable<Key_t, Value_t>;
+  friend class LRUCache<Key_t, Value_t>;
+
+ public:
   uint32_t hash;  // Hash of key; used for fast sharding and comparisons
   Key_t key;
   Value_t value;
@@ -44,9 +55,30 @@ struct LRUHandle {
     this->key = key;
   }
 
+  // print for debugging
   friend std::ostream& operator<<(std::ostream& os, const LRUHandle& h) {
     return os << h.key << ": " << h.value << " (refs=" << h.refs
               << ", hash=" << h.hash << ")";
+  }
+  // print a list; this must be a dummpy list head
+  std::ostream& print_list(std::ostream& os) const {
+    os << this->key;
+    auto h = next;
+    while (h != this) {
+      os << ", " << h->key;
+      assert(h == h->next->prev);
+      h = h->next;
+    }
+    return os;
+  }
+  std::ostream& print_list_hash(std::ostream& os) const {
+    auto h = this;
+    while (h) {
+      os << '\t' << *h << ';';
+      h = h->next_hash;
+    }
+    os << '\n';
+    return os;
   }
 };
 }  // namespace gcache

@@ -70,35 +70,9 @@ class LRUCache {
   HandleTable<Key_t, Value_t> table_;
 
  public:  // for debugging
+  std::ostream& print(std::ostream& os, int indent = 0) const;
   friend std::ostream& operator<<(std::ostream& os, const LRUCache& c) {
-    size_t cnt = 0;
-    auto h = c.free_.next;
-    while (h != &c.free_) {
-      cnt++;
-      assert(h == h->next->prev);
-      os << h << ',';
-      h = h->next;
-    }
-    os << "LRUCache (capacity=" << c.capacity_ << ", #free=" << cnt << ") {\n";
-    os << "\tlru:    [";
-    h = c.lru_.next;
-    while (h != &c.lru_) {
-      os << h->key << ", ";
-      assert(h == h->next->prev);
-      h = h->next;
-    }
-    os << "]\n";
-    os << "\tin_use: [";
-    h = c.in_use_.next;
-    while (h != &c.in_use_) {
-      os << h->key << ", ";
-      assert(h == h->next->prev);
-      h = h->next;
-    }
-    os << "]\n";
-    os << c.table_;
-    os << "}\n";
-    return os;
+    return c.print(os);
   }
 };
 
@@ -236,6 +210,24 @@ void LRUCache<Key_t, Value_t>::list_append(Handle_t* list, Handle_t* e) {
   e->prev = list->prev;
   e->prev->next = e;
   e->next->prev = e;
+}
+
+template <typename Key_t, typename Value_t>
+std::ostream& LRUCache<Key_t, Value_t>::print(std::ostream& os,
+                                              int indent) const {
+  os << "LRUCache (capacity=" << capacity_ << ") {\n";
+  for (int i = 0; i < indent + 1; ++i) os << '\t';
+  os << "lru:    [";
+  lru_.print_list(os);
+  os << "]\n";
+  for (int i = 0; i < indent + 1; ++i) os << '\t';
+  os << "in_use: [";
+  in_use_.print_list(os);
+  os << "]\n";
+  for (int i = 0; i < indent + 1; ++i) os << '\t';
+  table_.print(os, indent + 1);
+  os << "}\n";
+  return os;
 }
 
 }  // namespace gcache

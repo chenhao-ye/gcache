@@ -28,14 +28,15 @@ class LRUCache {
   LRUCache& operator=(LRUCache&&) = delete;
   void init_pool(size_t capacity);
 
+  // Set pin to be true to pin the returned Handle so it won't be recycled by
+  // LRU; a pinned handle must be unpinned later by calling release()
+
   // Insert a handle into cache with giveb key and hash if not exists; if does,
   // return the existing one
-  // Returned handle must be released
-  Handle_t* insert(Key_t key, uint32_t hash);
+  Handle_t* insert(Key_t key, uint32_t hash, bool pin = false);
   // Search for a handle; return nullptr if not exist
-  // Returned handle must be release
-  Handle_t* lookup(Key_t key, uint32_t hash);
-  // Release handle returned by insert/lookup
+  Handle_t* lookup(Key_t key, uint32_t hash, bool pin = false);
+  // Release pinned handle returned by insert/lookup
   void release(Handle_t* handle);
 
  private:
@@ -97,7 +98,7 @@ LRUCache<Key_t, Value_t>::~LRUCache() {
 
 template <typename Key_t, typename Value_t>
 typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
-    Key_t key, uint32_t hash) {
+    Key_t key, uint32_t hash, bool pin) {
   // Disable support for capacity_ == 0; the user must set capacity first
   assert(capacity_ > 0 && pool_);
 
@@ -105,7 +106,7 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   Handle_t** ptr = table_.find_pointer(key, hash);
   Handle_t* e = *ptr;
   if (e) {
-    ref(e);
+    if (pin) ref(e);
     return e;
   }
 
@@ -115,16 +116,20 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   e->init(key, hash);
   e->next_hash = nullptr;
   *ptr = e;
-  e->refs++;
-  list_append(&in_use_, e);
+  assert(e->refs == 1);
+  if (pin) {
+    e->refs++;
+    list_append(&in_use_, e);
+  } else
+    list_append(&lru_, e);
   return e;
 }
 
 template <typename Key_t, typename Value_t>
 typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::lookup(
-    Key_t key, uint32_t hash) {
+    Key_t key, uint32_t hash, bool pin) {
   Handle_t* e = table_.lookup(key, hash);
-  if (e) ref(e);
+  if (e && pin) ref(e);
   return e;
 }
 

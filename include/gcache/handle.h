@@ -60,10 +60,14 @@ class LRUHandle {
     return os << h.key << ": " << h.value << " (refs=" << h.refs
               << ", hash=" << h.hash << ")";
   }
+
   // print a list; this must be a dummpy list head
   std::ostream& print_list(std::ostream& os) const {
-    os << this->key;
     auto h = next;
+    if (h == this) return os;
+    os << h->key;
+    assert(h == h->next->prev);
+    h = h->next;
     while (h != this) {
       os << ", " << h->key;
       assert(h == h->next->prev);
@@ -71,6 +75,7 @@ class LRUHandle {
     }
     return os;
   }
+
   std::ostream& print_list_hash(std::ostream& os) const {
     auto h = this;
     while (h) {

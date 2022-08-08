@@ -29,7 +29,7 @@ class HandleTable {
 
   Handle_t* lookup(Key_t key, uint32_t hash);
   Handle_t* remove(Key_t key, uint32_t hash);
-  void reserve(size_t size);  // size must be 2^n
+  void reserve(size_t size);  // size must be 2^n; must be called before any r/w
   // insertion requires a handle allocator and thus not provided as a built-in
   // API. Please build it on LRUCache with find_pointer().
 
@@ -99,6 +99,7 @@ std::ostream& HandleTable<Key_t, Value_t>::print(std::ostream& os,
     for (int j = 0; j < indent; ++j) os << '\t';
     h->print_list_hash(os);
   }
+  for (int j = 0; j < indent; ++j) os << '\t';
   os << "}\n";
   return os;
 }

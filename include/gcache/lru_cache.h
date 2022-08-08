@@ -104,7 +104,10 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   // Search to see if already exists
   Handle_t** ptr = table_.find_pointer(key, hash);
   Handle_t* e = *ptr;
-  if (e) goto done;
+  if (e) {
+    ref(e);
+    return e;
+  }
 
   // Allocate a new handle
   e = alloc_handle();
@@ -112,10 +115,8 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   e->init(key, hash);
   e->next_hash = nullptr;
   *ptr = e;
-
-done:
   e->refs++;
-  if (e->refs == 2) list_append(&in_use_, e);
+  list_append(&in_use_, e);
   return e;
 }
 
@@ -162,7 +163,7 @@ LRUCache<Key_t, Value_t>::alloc_handle() {
   // Evict one handle from LRU and recycle it
   if (lru_.next == &lru_) return nullptr;  // No more space
   Handle_t* e = lru_.next;
-  list_remove(e);  // remove from lru_
+  list_remove(e);  // Remove from lru_
   assert(e->refs == 1);
   [[maybe_unused]] Handle_t* e_;
   e_ = table_.remove(e->key, e->hash);

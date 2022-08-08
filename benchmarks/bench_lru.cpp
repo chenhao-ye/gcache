@@ -51,27 +51,32 @@ void test() {
   if (h5 != nullptr)
     throw std::runtime_error("Expected evicted handle remains in cache!");
 
-  cache.erase(3, 1003);
-  std::cout << "\n=== Expect: lru: [2, 4], in_use: [1] ===\n";
+  h5 = cache.insert(5, 1005);
+  std::cout << "\n=== Expect: lru: [4], in_use: [1, 3, 5] ===\n";
   std::cout << cache;
 
-  h5 = cache.insert(5, 1005);
-  std::cout << "\n=== Expect: lru: [2, 4], in_use: [1] ===\n";
-  std::cout << cache;
-  if (h5 != nullptr) throw std::runtime_error("Unreleased handle is freed!");
-  cache.release(h3);
-
-  h5 = cache.insert(5, 1005);
-  assert(h5);
-  h5->value = 5555;
-  std::cout << "\n=== Expect: lru: [2, 4], in_use: [1, 5] ===\n";
+  auto h6 = cache.insert(6, 1006);
+  assert(h6);
+  h6->value = 666;
+  std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
   std::cout << cache;
 
   auto h5_ = cache.insert(5, 1005);
-  assert(h5_);
-  h5->value = 55555;
-  std::cout << "\n=== Expect: lru: [4], in_use: [1, 5] ===\n";
+  assert(h5_ == h5);
+  h5_->value = 5555;
+  std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
   std::cout << cache;
+
+  auto h7 = cache.insert(7, 1007);
+  std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
+  std::cout << cache;
+  if (h7) throw std::runtime_error("Overflow handle is not denied!");
+
+  cache.release(h1);
+  cache.release(h3);
+  cache.release(h5);
+  cache.release(h5_);
+  cache.release(h6);
 }
 
 void bench() {

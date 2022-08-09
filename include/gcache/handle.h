@@ -30,6 +30,7 @@ template <typename Key_t, typename Value_t>
 class HandleTable;
 template <typename Key_t, typename Value_t>
 class LRUCache;
+class GhostCache;
 
 // An entry is a variable length heap-allocated structure.  Entries
 // are kept in a circular doubly linked list ordered by access time.
@@ -43,6 +44,7 @@ class LRUHandle {
 
   friend class HandleTable<Key_t, Value_t>;
   friend class LRUCache<Key_t, Value_t>;
+  friend class GhostCache;
 
  public:
   uint32_t hash;  // Hash of key; used for fast sharding and comparisons

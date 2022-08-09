@@ -13,6 +13,8 @@
 
 namespace gcache {
 
+class GhostCache;
+
 // Key_t should be lightweight that can be pass-by-value
 // Value_t should be trivially copyable
 template <typename Key_t, typename Value_t>
@@ -20,13 +22,12 @@ class LRUCache {
  public:
   typedef LRUHandle<Key_t, Value_t> Handle_t;
   LRUCache();
-  LRUCache(size_t capacity) : LRUCache() { init_pool(capacity); };
   ~LRUCache();
   LRUCache(const LRUCache&) = delete;
   LRUCache(LRUCache&&) = delete;
   LRUCache& operator=(const LRUCache&) = delete;
   LRUCache& operator=(LRUCache&&) = delete;
-  void init_pool(size_t capacity);
+  void init(size_t capacity);
 
   // Set pin to be true to pin the returned Handle so it won't be recycled by
   // LRU; a pinned handle must be unpinned later by calling release()
@@ -38,6 +39,10 @@ class LRUCache {
   Handle_t* lookup(Key_t key, uint32_t hash, bool pin = false);
   // Release pinned handle returned by insert/lookup
   void release(Handle_t* handle);
+  // Similar to insert but 1) never pin and the targeted handle must be in LRU
+  // list, 2) return `successor`: the handle with the same order as the returned
+  // handle after LRU operations (nullptr if newly inserted).
+  Handle_t* touch(Key_t key, uint32_t hash, Handle_t*& successor);
 
  private:
   Handle_t* alloc_handle();
@@ -46,6 +51,9 @@ class LRUCache {
   void list_append(Handle_t* list, Handle_t* e);
   void ref(Handle_t* e);
   void unref(Handle_t* e);
+  // Perform LRU operation and return the handle with the same order in the list
+  // after LRU (usually it's e->next)
+  Handle_t* lru_refresh(Handle_t* e);
 
   // Initialized before use.
   size_t capacity_;
@@ -70,6 +78,8 @@ class LRUCache {
   // Hash table to lookup
   HandleTable<Key_t, Value_t> table_;
 
+  friend GhostCache;
+
  public:  // for debugging
   std::ostream& print(std::ostream& os, int indent = 0) const;
   friend std::ostream& operator<<(std::ostream& os, const LRUCache& c) {
@@ -84,7 +94,7 @@ LRUCache<Key_t, Value_t>::LRUCache() : capacity_(0), pool_(nullptr), table_() {
   lru_.prev = &lru_;
   in_use_.next = &in_use_;
   in_use_.prev = &in_use_;
-  // free_ will be initialized when init_pool() is called
+  // free_ will be initialized when init() is called
 }
 
 template <typename Key_t, typename Value_t>
@@ -97,6 +107,24 @@ LRUCache<Key_t, Value_t>::~LRUCache() {
 }
 
 template <typename Key_t, typename Value_t>
+void LRUCache<Key_t, Value_t>::init(size_t capacity) {
+  assert(!capacity_ && !pool_);
+  assert(capacity);
+  capacity_ = capacity;
+  pool_ = new Handle_t[capacity];
+  // Put these entries into free list
+  free_.next = &pool_[0];
+  pool_[0].prev = &free_;
+  free_.prev = &pool_[capacity - 1];
+  pool_[capacity - 1].next = &free_;
+  for (size_t i = 0; i < capacity - 1; ++i) {
+    pool_[i].next = &pool_[i + 1];
+    pool_[i + 1].prev = &pool_[i];
+  }
+  table_.reserve(capacity);
+}
+
+template <typename Key_t, typename Value_t>
 typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
     Key_t key, uint32_t hash, bool pin) {
   // Disable support for capacity_ == 0; the user must set capacity first
@@ -106,11 +134,13 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   Handle_t** ptr = table_.find_pointer(key, hash);
   Handle_t* e = *ptr;
   if (e) {
-    if (pin) ref(e);
+    if (pin)
+      ref(e);
+    else if (e->refs == 1)
+      lru_refresh(e);
     return e;
   }
 
-  // Allocate a new handle
   e = alloc_handle();
   if (!e) return nullptr;
   e->init(key, hash);
@@ -120,8 +150,9 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   if (pin) {
     e->refs++;
     list_append(&in_use_, e);
-  } else
+  } else {
     list_append(&lru_, e);
+  }
   return e;
 }
 
@@ -139,21 +170,28 @@ void LRUCache<Key_t, Value_t>::release(Handle_t* handle) {
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::init_pool(size_t capacity) {
-  assert(!capacity_ && !pool_);
-  assert(capacity);
-  capacity_ = capacity;
-  pool_ = new Handle_t[capacity];
-  // Put these entries into free list
-  free_.next = &pool_[0];
-  pool_[0].prev = &free_;
-  free_.prev = &pool_[capacity - 1];
-  pool_[capacity - 1].next = &free_;
-  for (size_t i = 0; i < capacity - 1; ++i) {
-    pool_[i].next = &pool_[i + 1];
-    pool_[i + 1].prev = &pool_[i];
+typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::touch(
+    Key_t key, uint32_t hash, Handle_t*& successor) {
+  // Disable support for capacity_ == 0; the user must set capacity first
+  assert(capacity_ > 0 && pool_);
+
+  // Search to see if already exists
+  Handle_t** ptr = table_.find_pointer(key, hash);
+  Handle_t* e = *ptr;
+  if (e) {
+    successor = lru_refresh(e);
+    return e;
   }
-  table_.reserve(capacity);
+
+  successor = nullptr;
+  e = alloc_handle();
+  if (!e) return nullptr;
+  e->init(key, hash);
+  e->next_hash = nullptr;
+  *ptr = e;
+  assert(e->refs == 1);
+  list_append(&lru_, e);
+  return e;
 }
 
 template <typename Key_t, typename Value_t>
@@ -216,6 +254,18 @@ void LRUCache<Key_t, Value_t>::list_append(Handle_t* list, Handle_t* e) {
   e->prev = list->prev;
   e->prev->next = e;
   e->next->prev = e;
+}
+
+template <typename Key_t, typename Value_t>
+typename LRUCache<Key_t, Value_t>::Handle_t*
+LRUCache<Key_t, Value_t>::lru_refresh(Handle_t* e) {
+  assert(e != &lru_);
+  assert(e->refs == 1);
+  auto successor = e->next;
+  if (successor == &lru_) return e;  // no need to move
+  list_remove(e);
+  list_append(&lru_, e);
+  return successor;
 }
 
 template <typename Key_t, typename Value_t>

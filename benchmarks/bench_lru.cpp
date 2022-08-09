@@ -8,7 +8,7 @@ using namespace gcache;
 
 void test() {
   LRUCache<uint32_t, uint64_t> cache;
-  cache.init_pool(4);
+  cache.init(4);
 
   auto h1 = cache.insert(1, 1001, true);
   assert(h1);

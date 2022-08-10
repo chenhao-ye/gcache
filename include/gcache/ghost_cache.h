@@ -3,6 +3,7 @@
 #include <bit>
 #include <cstdint>
 #include <functional>
+#include <iomanip>
 #include <vector>
 
 #include "gcache/handle.h"
@@ -25,8 +26,8 @@ class CacheStat {
 
   // print for debugging
   friend std::ostream& operator<<(std::ostream& os, const CacheStat& s) {
-    return os << s.get_hit_rate() << " (" << s.hit_cnt << '/' << s.acc_cnt
-              << ')';
+    return os << std::setprecision(3) << s.get_hit_rate() << " (" << s.hit_cnt
+              << '/' << s.acc_cnt << ')';
   }
 };
 
@@ -61,7 +62,10 @@ class GhostCache {
         num_ticks((end_size - begin_size) / tick),
         lru_size(0),
         cache(),
-        size_boundaries(num_ticks, nullptr) {
+        size_boundaries(num_ticks, nullptr),
+        caches_stat(num_ticks) {
+    assert(tick > 0);
+    assert(begin_size > 1);  // otherwise the first boundary will be LRU evicted
     cache.init(max_size);
   }
   void access(uint32_t page_id) {
@@ -123,37 +127,55 @@ void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
   } else {
     assert(lru_size <= max_size);
     if (lru_size < max_size) ++lru_size;
-    size_idx = (lru_size - min_size) / tick;
+    if (lru_size < min_size)
+      size_idx = 0;
+    else
+      size_idx = (lru_size - min_size) / tick;
     if (size_idx < num_ticks &&
         lru_size - min_size + 1 == (size_idx + 1) * tick)
       size_boundaries[size_idx] = cache.lru_.next;
   }
   for (uint32_t i = 0; i < size_idx; ++i) {
     auto& b = size_boundaries[i];
+    if (!b) continue;
     b->value++;
     b = b->next;
-    caches_stat[i].add_hit();
   }
-  for (uint32_t i = size_idx; i < num_ticks; ++i) caches_stat[i].add_hit();
+  if (s) {
+    for (uint32_t i = 0; i < size_idx; ++i) caches_stat[i].add_miss();
+    for (uint32_t i = size_idx; i < num_ticks; ++i) caches_stat[i].add_hit();
+  } else {
+    for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_miss();
+  }
+
   h->value = 0;
 }
 
 std::ostream& GhostCache::print(std::ostream& os, int indent) const {
   os << "GhostCache (tick=" << tick << ", min=" << min_size
-     << ", max=" << max_size << "num_ticks=" << num_ticks
-     << "lru_size=" << lru_size << ") {\n";
+     << ", max=" << max_size << ", num_ticks=" << num_ticks
+     << ", lru_size=" << lru_size << ") {\n";
 
   for (int i = 0; i < indent + 1; ++i) os << '\t';
-  os << "Boundaries: [" << size_boundaries[0];
-  for (uint32_t i = 1; i < num_ticks; ++i)
-    os << ", " << size_boundaries[i]->key;
+  os << "Boundaries: [";
+  if (size_boundaries[0])
+    os << size_boundaries[0]->key;
+  else
+    os << "(null)";
+  for (uint32_t i = 1; i < num_ticks; ++i) {
+    os << ", ";
+    if (size_boundaries[i])
+      os << size_boundaries[i]->key;
+    else
+      os << "(null)";
+  }
   os << "]\n";
   for (int i = 0; i < indent + 1; ++i) os << '\t';
-  os << "Stat: [" << min_size << ": " << caches_stat[0];
+  os << "Stat:       [" << min_size << ": " << caches_stat[0];
   for (uint32_t i = 1; i < num_ticks; ++i)
     os << ", " << min_size + i * tick << ": " << caches_stat[i];
   os << "]\n";
-  for (int i = 0; i < indent + 1; ++i) os << '\t';
+  for (int i = 0; i < indent; ++i) os << '\t';
   os << "}\n";
   return os;
 }

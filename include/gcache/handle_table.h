@@ -4,6 +4,7 @@
 #pragma once
 
 #include <bit>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <iostream>

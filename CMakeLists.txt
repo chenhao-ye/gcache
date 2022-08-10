@@ -12,4 +12,5 @@ set(SOURCE_FILES
 	include/gcache/lru_cache.h)
 
 include_directories(include)
-add_executable(gcache_bench ${SOURCE_FILES} benchmarks/bench_lru.cpp)
+add_executable(gcache_bench_lru ${SOURCE_FILES} benchmarks/bench_lru.cpp)
+add_executable(gcache_bench_ghost ${SOURCE_FILES} benchmarks/bench_ghost.cpp)

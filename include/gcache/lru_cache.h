@@ -282,6 +282,7 @@ std::ostream& LRUCache<Key_t, Value_t>::print(std::ostream& os,
   os << "]\n";
   for (int i = 0; i < indent + 1; ++i) os << '\t';
   table_.print(os, indent + 1);
+  for (int i = 0; i < indent; ++i) os << '\t';
   os << "}\n";
   return os;
 }

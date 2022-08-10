@@ -6,6 +6,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -Werror -g -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall -Werror")
 
 set(SOURCE_FILES
+	include/gcache/ghost_cache.h
 	include/gcache/handle.h
 	include/gcache/handle_table.h
 	include/gcache/lru_cache.h)

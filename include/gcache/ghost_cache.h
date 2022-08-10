@@ -58,14 +58,15 @@ class GhostCache {
   GhostCache(uint32_t tick, uint32_t begin_size, uint32_t end_size)
       : tick(tick),
         min_size(begin_size),
-        max_size(((end_size - begin_size) / tick - 1) * tick + begin_size),
-        num_ticks((end_size - begin_size) / tick),
+        max_size(((end_size - begin_size) / tick) * tick + begin_size),
+        num_ticks((end_size - begin_size) / tick + 1),
         lru_size(0),
         cache(),
         size_boundaries(num_ticks, nullptr),
         caches_stat(num_ticks) {
     assert(tick > 0);
     assert(begin_size > 1);  // otherwise the first boundary will be LRU evicted
+    assert(min_size + (num_ticks - 1) * tick == max_size);
     cache.init(max_size);
   }
   void access(uint32_t page_id) {
@@ -127,12 +128,11 @@ void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
   } else {
     assert(lru_size <= max_size);
     if (lru_size < max_size) ++lru_size;
-    if (lru_size < min_size)
+    if (lru_size <= min_size)
       size_idx = 0;
     else
-      size_idx = (lru_size - min_size) / tick;
-    if (size_idx < num_ticks &&
-        lru_size - min_size + 1 == (size_idx + 1) * tick)
+      size_idx = (lru_size - min_size + tick - 1) / tick;
+    if (size_idx < num_ticks && lru_size - min_size == size_idx * tick)
       size_boundaries[size_idx] = cache.lru_.next;
   }
   for (uint32_t i = 0; i < size_idx; ++i) {
@@ -175,6 +175,8 @@ std::ostream& GhostCache::print(std::ostream& os, int indent) const {
   for (uint32_t i = 1; i < num_ticks; ++i)
     os << ", " << min_size + i * tick << ": " << caches_stat[i];
   os << "]\n";
+  for (int i = 0; i < indent + 1; ++i) os << '\t';
+  cache.print(os, indent + 1);
   for (int i = 0; i < indent; ++i) os << '\t';
   os << "}\n";
   return os;

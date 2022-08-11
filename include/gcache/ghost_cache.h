@@ -97,7 +97,11 @@ template <uint32_t SampleShift = 5>
 class SampleGhostCache : public GhostCache {
  public:
   SampleGhostCache(uint32_t tick, uint32_t begin_size, uint32_t end_size)
-      : GhostCache(tick, begin_size, end_size) {
+      : GhostCache(tick >> SampleShift, begin_size >> SampleShift,
+                   end_size >> SampleShift) {
+    assert(tick % (1 << SampleShift) == 0);
+    assert(begin_size % (1 << SampleShift) == 0);
+    assert(end_size % (1 << SampleShift) == 0);
     // Left few bits used for sampling; right few used for hash.
     // Make sure they never overlap.
     assert(std::countr_zero<uint32_t>(std::bit_ceil<uint32_t>(max_size)) <=
@@ -108,6 +112,13 @@ class SampleGhostCache : public GhostCache {
   void access(uint32_t page_id) {
     uint32_t hash = fast_hash(page_id);
     if ((hash >> (32 - SampleShift)) == 0) access_impl(page_id, hash);
+  }
+
+  double get_hit_rate(uint32_t cache_size) {
+    cache_size >>= SampleShift;
+    assert((cache_size - min_size) % tick == 0);
+    uint32_t size_idx = (cache_size - min_size) / tick;
+    return caches_stat[size_idx].get_hit_rate();
   }
 };
 

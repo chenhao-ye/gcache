@@ -65,76 +65,73 @@ void test2() {
   std::cout << ghost_cache;
 }
 
+constexpr const uint32_t bench_size = 256 * 1024;
+
 void bench1() {
-  GhostCache ghost_cache(16 * 1024, 16 * 1024, 256 * 1024);
+  GhostCache ghost_cache(bench_size / 16, bench_size / 16, bench_size);
 
   // filling the cache
   auto ts0 = rdtsc();
-  for (int i = 0; i < 256 * 1024; ++i) ghost_cache.access(i);
+  for (uint32_t i = 0; i < bench_size; ++i) ghost_cache.access(i);
   auto ts1 = rdtsc();
 
   // cache hit
-  for (int i = 0; i < 256 * 1024; ++i) ghost_cache.access(i);
+  for (uint32_t i = 0; i < bench_size; ++i) ghost_cache.access(i);
   auto ts2 = rdtsc();
 
   // cache miss
-  for (int i = 0; i < 256 * 1024; ++i) ghost_cache.access(i + 256 * 1024);
+  for (uint32_t i = 0; i < bench_size; ++i) ghost_cache.access(i + bench_size);
   auto ts3 = rdtsc();
 
-  for (int i = 0; i < 256 * 1024; ++i) fast_hash(i);
+  for (uint32_t i = 0; i < bench_size; ++i) fast_hash(i);
   auto ts4 = rdtsc();
 
-  std::cout << "Fill: " << (ts1 - ts0) / (256 * 1024) << " cycles/op\n";
-  std::cout << "Hit:  " << (ts2 - ts1) / (256 * 1024) << " cycles/op\n";
-  std::cout << "Miss: " << (ts3 - ts2) / (256 * 1024) << " cycles/op\n";
-  std::cout << "Hash: " << (ts4 - ts3) / (256 * 1024) << " cycles/op\n";
+  std::cout << "Fill: " << (ts1 - ts0) / bench_size << " cycles/op\n";
+  std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
+  std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
+  std::cout << "Hash: " << (ts4 - ts3) / bench_size << " cycles/op\n";
 }
 
 void bench2() {
-  SampleGhostCache<5> sample_ghost_cache(16 * 1024 / 32, 16 * 1024 / 32,
-                                         256 * 1024 / 32);
+  SampleGhostCache<5> sample_ghost_cache(bench_size / 16, bench_size / 16,
+                                         bench_size);
 
   // filling the cache
   auto ts0 = rdtsc();
-  for (int i = 0; i < 256 * 1024; ++i) sample_ghost_cache.access(i);
+  for (uint32_t i = 0; i < bench_size; ++i) sample_ghost_cache.access(i);
   auto ts1 = rdtsc();
 
   // cache hit
-  for (int i = 0; i < 256 * 1024; ++i) sample_ghost_cache.access(i);
+  for (uint32_t i = 0; i < bench_size; ++i) sample_ghost_cache.access(i);
   auto ts2 = rdtsc();
 
   // cache miss
-  for (int i = 0; i < 256 * 1024; ++i)
-    sample_ghost_cache.access(i + 256 * 1024);
+  for (uint32_t i = 0; i < bench_size; ++i)
+    sample_ghost_cache.access(i + bench_size);
   auto ts3 = rdtsc();
 
-  for (int i = 0; i < 256 * 1024; ++i) fast_hash(i);
+  for (uint32_t i = 0; i < bench_size; ++i) fast_hash(i);
   auto ts4 = rdtsc();
 
-  std::cout << "Fill: " << (ts1 - ts0) / (256 * 1024) << " cycles/op\n";
-  std::cout << "Hit:  " << (ts2 - ts1) / (256 * 1024) << " cycles/op\n";
-  std::cout << "Miss: " << (ts3 - ts2) / (256 * 1024) << " cycles/op\n";
-  std::cout << "Hash: " << (ts4 - ts3) / (256 * 1024) << " cycles/op\n";
+  std::cout << "Fill: " << (ts1 - ts0) / bench_size << " cycles/op\n";
+  std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
+  std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
+  std::cout << "Hash: " << (ts4 - ts3) / bench_size << " cycles/op\n";
 }
 
-// 80/20 workload: 20% of hot entries consist of 80% of requests.
-// On average, each hot entry is 16x hotter than a cold one.
 void bench3() {
-  GhostCache ghost_cache(16 * 1024, 16 * 1024, 256 * 1024);
-  SampleGhostCache<5> sample_ghost_cache(16 * 1024 / 32, 16 * 1024 / 32,
-                                         256 * 1024 / 32);
+  GhostCache ghost_cache(bench_size / 16, bench_size / 16, bench_size);
+  SampleGhostCache<5> sample_ghost_cache(bench_size / 16, bench_size / 16,
+                                         bench_size);
 
   // filling the cache
-  for (int i = 0; i < 256 * 1024; ++i) {
+  std::vector<uint32_t> reqs;
+  for (uint32_t i = 0; i < bench_size; ++i) {
     ghost_cache.access(i);
     sample_ghost_cache.access(i);
+    reqs.emplace_back(i);
   }
 
-  std::vector<uint32_t> reqs;
-  uint32_t chunk_size = 256 * 1024 / 17;
-  for (uint32_t i = 0; i < chunk_size; ++i)
-    for (int i = 0; i < 16; ++i) reqs.emplace_back(i);
-  for (uint32_t i = chunk_size; i < chunk_size * 17; ++i) reqs.emplace_back(i);
   std::shuffle(reqs.begin(), reqs.end(), std::default_random_engine());
 
   // cache hit
@@ -144,14 +141,13 @@ void bench3() {
   for (auto i : reqs) sample_ghost_cache.access(i);
   auto ts2 = rdtsc();
 
-  std::cout << "w/o sampling: " << (ts1 - ts0) / (256 * 1024 / 17 * 17)
-            << " cycles/op\n";
-  for (uint32_t s = 16 * 1024; s < 256 * 1024; s += 16 * 1024)
+  std::cout << "w/o sampling: " << (ts1 - ts0) / bench_size << " cycles/op\n";
+  for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16)
     std::cout << "size=" << s << ": " << ghost_cache.get_hit_rate(s) << '\n';
 
-  std::cout << "w/ sampling:  " << (ts2 - ts1) / (256 * 1024 / 17 * 17)
+  std::cout << "w/ sampling:  " << (ts2 - ts1) / (bench_size / 17 * 17)
             << " cycles/op\n";
-  for (uint32_t s = 16 * 1024 / 32; s < 256 * 1024 / 32; s += 16 * 1024 / 32)
+  for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16)
     std::cout << "size=" << s << ": " << sample_ghost_cache.get_hit_rate(s)
               << '\n';
 }

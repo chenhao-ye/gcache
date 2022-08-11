@@ -131,8 +131,7 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   assert(capacity_ > 0 && pool_);
 
   // Search to see if already exists
-  Handle_t** ptr = table_.find_pointer(key, hash);
-  Handle_t* e = *ptr;
+  Handle_t* e = table_.lookup(key, hash);
   if (e) {
     if (pin)
       ref(e);
@@ -144,8 +143,7 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
   e = alloc_handle();
   if (!e) return nullptr;
   e->init(key, hash);
-  e->next_hash = nullptr;
-  *ptr = e;
+  table_.insert(e);
   assert(e->refs == 1);
   if (pin) {
     e->refs++;
@@ -176,8 +174,7 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::touch(
   assert(capacity_ > 0 && pool_);
 
   // Search to see if already exists
-  Handle_t** ptr = table_.find_pointer(key, hash);
-  Handle_t* e = *ptr;
+  Handle_t* e = table_.lookup(key, hash);
   if (e) {
     successor = lru_refresh(e);
     return e;
@@ -187,8 +184,7 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::touch(
   e = alloc_handle();
   if (!e) return nullptr;
   e->init(key, hash);
-  e->next_hash = nullptr;
-  *ptr = e;
+  table_.insert(e);
   assert(e->refs == 1);
   list_append(&lru_, e);
   return e;
@@ -206,8 +202,8 @@ LRUCache<Key_t, Value_t>::alloc_handle() {
   // Evict one handle from LRU and recycle it
   if (lru_.next == &lru_) return nullptr;  // No more space
   Handle_t* e = lru_.next;
-  list_remove(e);  // Remove from lru_
   assert(e->refs == 1);
+  list_remove(e);  // Remove from lru_
   [[maybe_unused]] Handle_t* e_;
   e_ = table_.remove(e->key, e->hash);
   assert(e_ == e);

@@ -12,6 +12,15 @@
 
 namespace gcache {
 
+// an implementation from Stackoverflow:
+// https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key/12996028#12996028
+uint32_t fast_hash(uint32_t x) {
+  x = ((x >> 16) ^ x) * 0x45d9f3b;
+  x = ((x >> 16) ^ x) * 0x45d9f3b;
+  x = (x >> 16) ^ x;
+  return x;
+}
+
 class CacheStat {
   uint64_t acc_cnt;
   uint64_t hit_cnt;
@@ -69,8 +78,12 @@ class GhostCache {
     assert(min_size + (num_ticks - 1) * tick == max_size);
     cache.init(max_size);
   }
-  void access(uint32_t page_id) {
-    access_impl(page_id, std::hash<uint32_t>()(page_id));
+  void access(uint32_t page_id) { access_impl(page_id, fast_hash(page_id)); }
+
+  double get_hit_rate(uint32_t cache_size) {
+    assert((cache_size - min_size) % tick == 0);
+    uint32_t size_idx = (cache_size - min_size) / tick;
+    return caches_stat[size_idx].get_hit_rate();
   }
 
   std::ostream& print(std::ostream& os, int indent = 0) const;
@@ -79,19 +92,21 @@ class GhostCache {
   }
 };
 
-template <uint32_t SampleShift = 8>
+// only sample 1/32 (~3%)
+template <uint32_t SampleShift = 5>
 class SampleGhostCache : public GhostCache {
+ public:
   SampleGhostCache(uint32_t tick, uint32_t begin_size, uint32_t end_size)
       : GhostCache(tick, begin_size, end_size) {
     // Left few bits used for sampling; right few used for hash.
     // Make sure they never overlap.
     assert(std::countr_zero<uint32_t>(std::bit_ceil<uint32_t>(max_size)) <=
-           32 - SampleShift);
+           32 - static_cast<int>(SampleShift));
   }
 
   // Only update ghost cache if the first few bits of hash is all zero
   void access(uint32_t page_id) {
-    uint32_t hash = std::hash<uint32_t>()(page_id);
+    uint32_t hash = fast_hash(page_id);
     if ((hash >> (32 - SampleShift)) == 0) access_impl(page_id, hash);
   }
 };

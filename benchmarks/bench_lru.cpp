@@ -3,11 +3,12 @@
 #include <stdexcept>
 
 #include "gcache/lru_cache.h"
+#include "util.h"
 
 using namespace gcache;
 
 void test() {
-  LRUCache<uint32_t, uint64_t> cache;
+  LRUCache<uint32_t, uint32_t> cache;
   cache.init(4);
 
   auto h1 = cache.insert(1, 1001, true);
@@ -99,8 +100,26 @@ void test() {
 }
 
 void bench() {
-  // auto cache = new LRUCache<uint32_t, uint64_t>();
-  // cache->init_pool(1024 * 256);  // #blocks for 1GB working set
+  LRUCache<uint32_t, uint32_t> cache;
+  cache.init(256 * 1024);  // #blocks for 1GB working set
+
+  // filling the cache
+  auto ts0 = rdtsc();
+  for (int i = 0; i < 256 * 1024; ++i) cache.insert(i, i);
+  auto ts1 = rdtsc();
+
+  // cache hit
+  for (int i = 0; i < 256 * 1024; ++i) cache.insert(i, i);
+  auto ts2 = rdtsc();
+
+  // cache miss
+  for (int i = 0; i < 256 * 1024; ++i)
+    cache.insert(i + 256 * 1024, i + 256 * 1024);
+  auto ts3 = rdtsc();
+
+  std::cout << "Fill: " << (ts1 - ts0) / (256 * 1024) << " cycles/op\n";
+  std::cout << "Hit:  " << (ts2 - ts1) / (256 * 1024) << " cycles/op\n";
+  std::cout << "Miss: " << (ts3 - ts2) / (256 * 1024) << " cycles/op\n";
 }
 
 int main() {

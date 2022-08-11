@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <stdexcept>
@@ -83,7 +84,18 @@ void bench1() {
   for (uint32_t i = 0; i < bench_size; ++i) ghost_cache.access(i + bench_size);
   auto ts3 = rdtsc();
 
-  for (uint32_t i = 0; i < bench_size; ++i) fast_hash(i);
+  for (uint32_t i = 0; i < bench_size / 8; ++i) {
+    // manually flatten the loop, becaues we cannot turn on compiler
+    // optimization which will remove the whole loop since it produces nothing.
+    gcache_hash(i * 8);
+    gcache_hash(i * 8 + 1);
+    gcache_hash(i * 8 + 2);
+    gcache_hash(i * 8 + 3);
+    gcache_hash(i * 8 + 4);
+    gcache_hash(i * 8 + 5);
+    gcache_hash(i * 8 + 6);
+    gcache_hash(i * 8 + 7);
+  }
   auto ts4 = rdtsc();
 
   std::cout << "Fill: " << (ts1 - ts0) / bench_size << " cycles/op\n";
@@ -110,13 +122,9 @@ void bench2() {
     sample_ghost_cache.access(i + bench_size);
   auto ts3 = rdtsc();
 
-  for (uint32_t i = 0; i < bench_size; ++i) fast_hash(i);
-  auto ts4 = rdtsc();
-
   std::cout << "Fill: " << (ts1 - ts0) / bench_size << " cycles/op\n";
   std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
   std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
-  std::cout << "Hash: " << (ts4 - ts3) / bench_size << " cycles/op\n";
 }
 
 void bench3() {
@@ -142,14 +150,20 @@ void bench3() {
   auto ts2 = rdtsc();
 
   std::cout << "w/o sampling: " << (ts1 - ts0) / bench_size << " cycles/op\n";
-  for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16)
-    std::cout << "size=" << s << ": " << ghost_cache.get_hit_rate(s) << '\n';
-
   std::cout << "w/ sampling:  " << (ts2 - ts1) / (bench_size / 17 * 17)
             << " cycles/op\n";
-  for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16)
-    std::cout << "size=" << s << ": " << sample_ghost_cache.get_hit_rate(s)
-              << '\n';
+  std::cout << "=============== Hit Rate ===============\n";
+  std::cout << std::setw(8) << "size" << std::setw(16) << "w/o sampling"
+            << std::setw(16) << "w/ sampling" << '\n';
+  std::cout << "----------------------------------------\n";
+  for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16) {
+    std::cout << std::setw(7) << s / 1024 << 'K';
+    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
+              << ghost_cache.get_hit_rate(s) * 100 << '%';
+    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
+              << sample_ghost_cache.get_hit_rate(s) * 100 << "%\n";
+  }
+  std::cout << "========================================\n";
 }
 
 int main() {

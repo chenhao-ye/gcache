@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nmmintrin.h>  // for _mm_crc32_u32 instruction
+
 #include <bit>
 #include <cstdint>
 #include <functional>
@@ -9,12 +11,16 @@
 #include "gcache/handle.h"
 #include "gcache/handle_table.h"
 #include "gcache/lru_cache.h"
-
 namespace gcache {
 
-// A hash implementation from XXHash:
+/**
+ * Here we tested on several implementation of hash. The exposed one is defined
+ * as a macro `gcache_hash()`.
+ */
+
+// From XXHash:
 // https://github.com/Cyan4973/xxHash/blob/release/xxhash.h#L1968
-uint32_t fast_hash(uint32_t x) {
+uint32_t xxhash_u32(uint32_t x) {
   x ^= x >> 15;
   x *= 0x85EBCA77U;
   x ^= x >> 13;
@@ -22,6 +28,22 @@ uint32_t fast_hash(uint32_t x) {
   x ^= x >> 16;
   return x;
 }
+
+// From MurmurHash:
+// https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp#L68
+uint32_t murmurhash_u32(uint32_t x) {
+  x ^= x >> 16;
+  x *= 0x85ebca6b;
+  x ^= x >> 13;
+  x *= 0xc2b2ae35;
+  x ^= x >> 16;
+  return x;
+}
+
+// From CRC
+#define crc_u32(x) _mm_crc32_u32(/*seed*/ 0x537, x)
+
+#define gcache_hash(x) crc_u32(x)
 
 class CacheStat {
   uint64_t acc_cnt;
@@ -37,8 +59,8 @@ class CacheStat {
 
   // print for debugging
   friend std::ostream& operator<<(std::ostream& os, const CacheStat& s) {
-    return os << std::setprecision(3) << s.get_hit_rate() << " (" << s.hit_cnt
-              << '/' << s.acc_cnt << ')';
+    return os << std::setprecision(3) << s.get_hit_rate() * 100 << "% ("
+              << s.hit_cnt << '/' << s.acc_cnt << ')';
   }
 };
 
@@ -80,7 +102,7 @@ class GhostCache {
     assert(min_size + (num_ticks - 1) * tick == max_size);
     cache.init(max_size);
   }
-  void access(uint32_t page_id) { access_impl(page_id, fast_hash(page_id)); }
+  void access(uint32_t page_id) { access_impl(page_id, gcache_hash(page_id)); }
 
   double get_hit_rate(uint32_t cache_size) {
     assert((cache_size - min_size) % tick == 0);
@@ -112,7 +134,7 @@ class SampleGhostCache : public GhostCache {
 
   // Only update ghost cache if the first few bits of hash is all zero
   void access(uint32_t page_id) {
-    uint32_t hash = fast_hash(page_id);
+    uint32_t hash = gcache_hash(page_id);
     if ((hash >> (32 - SampleShift)) == 0) access_impl(page_id, hash);
   }
 

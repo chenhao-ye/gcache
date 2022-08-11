@@ -12,12 +12,14 @@
 
 namespace gcache {
 
-// an implementation from Stackoverflow:
-// https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key/12996028#12996028
+// A hash implementation from XXHash:
+// https://github.com/Cyan4973/xxHash/blob/release/xxhash.h#L1968
 uint32_t fast_hash(uint32_t x) {
-  x = ((x >> 16) ^ x) * 0x45d9f3b;
-  x = ((x >> 16) ^ x) * 0x45d9f3b;
-  x = (x >> 16) ^ x;
+  x ^= x >> 15;
+  x *= 0x85EBCA77U;
+  x ^= x >> 13;
+  x *= 0xC2B2AE3DU;
+  x ^= x >> 16;
   return x;
 }
 

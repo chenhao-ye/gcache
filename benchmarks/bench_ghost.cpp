@@ -10,6 +10,9 @@
 #include "util.h"
 
 using namespace gcache;
+constexpr const uint32_t num_ops = 32 * 1024 * 1024;
+constexpr const uint32_t bench_size = 256 * 1024;             // 1 GB cache
+constexpr const uint32_t large_bench_size = 2 * 1024 * 1024;  // 8 GB cache
 
 void test1() {
   GhostCache ghost_cache(1, 3, 6);
@@ -66,8 +69,6 @@ void test2() {
   std::cout << ghost_cache;
 }
 
-constexpr const uint32_t bench_size = 256 * 1024;
-
 void bench1() {
   GhostCache ghost_cache(bench_size / 16, bench_size / 16, bench_size);
 
@@ -98,6 +99,7 @@ void bench1() {
   }
   auto ts4 = rdtsc();
 
+  std::cout << "=== Bench 1 ===\n";
   std::cout << "Fill: " << (ts1 - ts0) / bench_size << " cycles/op\n";
   std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
   std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
@@ -122,6 +124,7 @@ void bench2() {
     sample_ghost_cache.access(i + bench_size);
   auto ts3 = rdtsc();
 
+  std::cout << "=== Bench 2 ===\n";
   std::cout << "Fill: " << (ts1 - ts0) / bench_size << " cycles/op\n";
   std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
   std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
@@ -134,7 +137,8 @@ void bench3() {
 
   // filling the cache
   std::vector<uint32_t> reqs;
-  for (uint32_t i = 0; i < bench_size; ++i) {
+  // working set is 1.2x of max cache size
+  for (uint32_t i = 0; i < bench_size + bench_size / 4; ++i) {
     ghost_cache.access(i);
     sample_ghost_cache.access(i);
     reqs.emplace_back(i);
@@ -144,14 +148,16 @@ void bench3() {
 
   // cache hit
   auto ts0 = rdtsc();
-  for (auto i : reqs) ghost_cache.access(i);
+  for (uint32_t op = 0; op < num_ops; op++)
+    ghost_cache.access(reqs[op % bench_size]);
   auto ts1 = rdtsc();
-  for (auto i : reqs) sample_ghost_cache.access(i);
+  for (uint32_t op = 0; op < num_ops; op++)
+    sample_ghost_cache.access(reqs[op % bench_size]);
   auto ts2 = rdtsc();
 
-  std::cout << "w/o sampling: " << (ts1 - ts0) / bench_size << " cycles/op\n";
-  std::cout << "w/ sampling:  " << (ts2 - ts1) / (bench_size / 17 * 17)
-            << " cycles/op\n";
+  std::cout << "=== Bench 3 ===\n";
+  std::cout << "w/o sampling: " << (ts1 - ts0) / num_ops << " cycles/op\n";
+  std::cout << "w/ sampling:  " << (ts2 - ts1) / num_ops << " cycles/op\n";
   std::cout << "=============== Hit Rate ===============\n";
   std::cout << std::setw(8) << "size" << std::setw(16) << "w/o sampling"
             << std::setw(16) << "w/ sampling" << '\n';
@@ -166,11 +172,55 @@ void bench3() {
   std::cout << "========================================\n";
 }
 
+void bench4() {
+  GhostCache ghost_cache(large_bench_size / 16, large_bench_size / 16,
+                         large_bench_size);
+  SampleGhostCache<5> sample_ghost_cache(
+      large_bench_size / 16, large_bench_size / 16, large_bench_size);
+
+  // filling the cache
+  std::vector<uint32_t> reqs;
+  for (uint32_t i = 0; i < large_bench_size + large_bench_size / 4; ++i) {
+    ghost_cache.access(i);
+    sample_ghost_cache.access(i);
+    reqs.emplace_back(i);
+  }
+
+  std::shuffle(reqs.begin(), reqs.end(), std::default_random_engine());
+
+  // cache hit
+  auto ts0 = rdtsc();
+  for (uint32_t op = 0; op < num_ops; op++)
+    ghost_cache.access(reqs[op % large_bench_size]);
+  auto ts1 = rdtsc();
+  for (uint32_t op = 0; op < num_ops; op++)
+    sample_ghost_cache.access(reqs[op % large_bench_size]);
+  auto ts2 = rdtsc();
+
+  std::cout << "=== Bench 4 ===\n";
+  std::cout << "w/o sampling: " << (ts1 - ts0) / num_ops << " cycles/op\n";
+  std::cout << "w/ sampling:  " << (ts2 - ts1) / num_ops << " cycles/op\n";
+  std::cout << "=============== Hit Rate ===============\n";
+  std::cout << std::setw(8) << "size" << std::setw(16) << "w/o sampling"
+            << std::setw(16) << "w/ sampling" << '\n';
+  std::cout << "----------------------------------------\n";
+  for (uint32_t s = large_bench_size / 16; s < large_bench_size;
+       s += large_bench_size / 16) {
+    std::cout << std::setw(7) << s / 1024 << 'K';
+    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
+              << ghost_cache.get_hit_rate(s) * 100 << '%';
+    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
+              << sample_ghost_cache.get_hit_rate(s) * 100 << "%\n";
+  }
+  std::cout << "========================================\n";
+}
+
 int main() {
   test1();
   test2();
   bench1();  // ghost cache w/o sampling
   bench2();  // ghost cache w/ sampling
-  bench3();
+  bench3();  // hit rate comparsion
+  bench4();  // large bench: may exceed CPU cache size
   return 0;
 }

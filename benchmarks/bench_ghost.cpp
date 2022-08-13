@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
-#include <random>
 #include <stdexcept>
 
 #include "gcache/ghost_cache.h"
@@ -22,25 +21,27 @@ void test1() {
   ghost_cache.access(1);
   ghost_cache.access(2);
   ghost_cache.access(3);
-  std::cout << "Expect: Boundaries: [1, 0, (null)]; Stat: [0/4, 0/4, 0/4]\n";
+  std::cout
+      << "Expect: Boundaries: [1, 0, (null), (null)]; Stat: [0/4, 0/4, 0/4]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(4);
   ghost_cache.access(5);
-  std::cout << "Expect: Boundaries: [3, 2, 1]; Stat: [0/6, 0/6, 0/6]\n";
+  std::cout << "Expect: Boundaries: [3, 2, 1, 0]; Stat: [0/6, 0/6, 0/6]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(2);
-  std::cout << "Expect: Boundaries: [4, 3, 1]; Stat: [0/7, 1/7, 1/7]\n";
+  std::cout << "Expect: Boundaries: [4, 3, 1, 0]; Stat: [0/7, 1/7, 1/7]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(4);
-  std::cout << "Expect: Boundaries: [5, 3, 1]; Stat: [1/8, 2/8, 2/8]\n";
+  std::cout << "Expect: Boundaries: [5, 3, 1, 0]; Stat: [1/8, 2/8, 2/8]\n";
   std::cout << ghost_cache;
+  std::cout << std::flush;
 }
 
 void test2() {
-  GhostCache ghost_cache(2, 2, 7);
+  GhostCache ghost_cache(2, 2, 6);
   std::cout << "=== Test 2 ===\n";
 
   ghost_cache.access(0);
@@ -67,6 +68,7 @@ void test2() {
   ghost_cache.access(4);
   std::cout << "Expect: Boundaries: [1, 6, 3]; Stat: [0/10, 0/10, 1/10]\n";
   std::cout << ghost_cache;
+  std::cout << std::flush;
 }
 
 void bench1() {
@@ -104,6 +106,7 @@ void bench1() {
   std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
   std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
   std::cout << "Hash: " << (ts4 - ts3) / bench_size << " cycles/op\n";
+  std::cout << std::flush;
 }
 
 void bench2() {
@@ -128,6 +131,7 @@ void bench2() {
   std::cout << "Fill: " << (ts1 - ts0) / bench_size << " cycles/op\n";
   std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
   std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
+  std::cout << std::flush;
 }
 
 void bench3() {
@@ -138,38 +142,51 @@ void bench3() {
   // filling the cache
   std::vector<uint32_t> reqs;
   // working set is 1.2x of max cache size
-  for (uint32_t i = 0; i < bench_size + bench_size / 4; ++i) {
+  for (uint32_t i = 0; i < bench_size; ++i) {
     ghost_cache.access(i);
     sample_ghost_cache.access(i);
     reqs.emplace_back(i);
   }
+  ghost_cache.reset_stat();
+  sample_ghost_cache.reset_stat();
+  std::random_shuffle(reqs.begin(), reqs.end());
 
-  std::shuffle(reqs.begin(), reqs.end(), std::default_random_engine());
+  uint64_t elapse_g = 0;
+  uint64_t elapse_s = 0;
+  uint64_t ts0 = rdtsc();
+  for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
+    for (auto j : reqs) ghost_cache.access(j);
+    elapse_g += rdtsc() - ts0;
+    std::random_shuffle(reqs.begin(), reqs.end());
+    ts0 = rdtsc();
+  }
 
-  // cache hit
-  auto ts0 = rdtsc();
-  for (uint32_t op = 0; op < num_ops; op++)
-    ghost_cache.access(reqs[op % bench_size]);
-  auto ts1 = rdtsc();
-  for (uint32_t op = 0; op < num_ops; op++)
-    sample_ghost_cache.access(reqs[op % bench_size]);
-  auto ts2 = rdtsc();
+  ts0 = rdtsc();
+  for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
+    for (auto j : reqs) sample_ghost_cache.access(j);
+    elapse_s += rdtsc() - ts0;
+    std::random_shuffle(reqs.begin(), reqs.end());
+    ts0 = rdtsc();
+  }
 
   std::cout << "=== Bench 3 ===\n";
-  std::cout << "w/o sampling: " << (ts1 - ts0) / num_ops << " cycles/op\n";
-  std::cout << "w/ sampling:  " << (ts2 - ts1) / num_ops << " cycles/op\n";
-  std::cout << "=============== Hit Rate ===============\n";
-  std::cout << std::setw(8) << "size" << std::setw(16) << "w/o sampling"
-            << std::setw(16) << "w/ sampling" << '\n';
-  std::cout << "----------------------------------------\n";
-  for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16) {
-    std::cout << std::setw(7) << s / 1024 << 'K';
-    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
-              << ghost_cache.get_hit_rate(s) * 100 << '%';
-    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
-              << sample_ghost_cache.get_hit_rate(s) * 100 << "%\n";
+  std::cout << "w/o sampling: " << elapse_g / num_ops << " cycles/op\n";
+  std::cout << "w/ sampling:  " << elapse_s / num_ops << " cycles/op\n";
+  std::cout
+      << "=========================== Hit Rate ===========================\n"
+      << "  size          w/o sampling                 w/ sampling        \n";
+  std::cout
+      << "----------------------------------------------------------------\n";
+  for (uint32_t s = bench_size / 16; s <= bench_size; s += bench_size / 16) {
+    std::cout << std::setw(7) << s / 1024 << "K ";
+    ghost_cache.get_stat(s).print(std::cout, 8);
+    std::cout << ' ';
+    sample_ghost_cache.get_stat(s).print(std::cout, 8);
+    std::cout << '\n';
   }
-  std::cout << "========================================\n";
+  std::cout
+      << "================================================================\n";
+  std::cout << std::flush;
 }
 
 void bench4() {
@@ -180,39 +197,52 @@ void bench4() {
 
   // filling the cache
   std::vector<uint32_t> reqs;
-  for (uint32_t i = 0; i < large_bench_size + large_bench_size / 4; ++i) {
+  for (uint32_t i = 0; i < large_bench_size; ++i) {
     ghost_cache.access(i);
     sample_ghost_cache.access(i);
     reqs.emplace_back(i);
   }
+  ghost_cache.reset_stat();
+  sample_ghost_cache.reset_stat();
+  std::random_shuffle(reqs.begin(), reqs.end());
 
-  std::shuffle(reqs.begin(), reqs.end(), std::default_random_engine());
+  uint64_t elapse_g = 0;
+  uint64_t elapse_s = 0;
+  uint64_t ts0 = rdtsc();
+  for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
+    for (auto j : reqs) ghost_cache.access(j);
+    elapse_g += rdtsc() - ts0;
+    std::random_shuffle(reqs.begin(), reqs.end());
+    ts0 = rdtsc();
+  }
 
-  // cache hit
-  auto ts0 = rdtsc();
-  for (uint32_t op = 0; op < num_ops; op++)
-    ghost_cache.access(reqs[op % large_bench_size]);
-  auto ts1 = rdtsc();
-  for (uint32_t op = 0; op < num_ops; op++)
-    sample_ghost_cache.access(reqs[op % large_bench_size]);
-  auto ts2 = rdtsc();
+  ts0 = rdtsc();
+  for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
+    for (auto j : reqs) sample_ghost_cache.access(j);
+    elapse_s += rdtsc() - ts0;
+    std::random_shuffle(reqs.begin(), reqs.end());
+    ts0 = rdtsc();
+  }
 
   std::cout << "=== Bench 4 ===\n";
-  std::cout << "w/o sampling: " << (ts1 - ts0) / num_ops << " cycles/op\n";
-  std::cout << "w/ sampling:  " << (ts2 - ts1) / num_ops << " cycles/op\n";
-  std::cout << "=============== Hit Rate ===============\n";
-  std::cout << std::setw(8) << "size" << std::setw(16) << "w/o sampling"
-            << std::setw(16) << "w/ sampling" << '\n';
-  std::cout << "----------------------------------------\n";
-  for (uint32_t s = large_bench_size / 16; s < large_bench_size;
+  std::cout << "w/o sampling: " << elapse_g / num_ops << " cycles/op\n";
+  std::cout << "w/ sampling:  " << elapse_s / num_ops << " cycles/op\n";
+  std::cout
+      << "=========================== Hit Rate ===========================\n"
+      << "  size          w/o sampling                 w/ sampling        \n";
+  std::cout
+      << "----------------------------------------------------------------\n";
+  for (uint32_t s = large_bench_size / 16; s <= large_bench_size;
        s += large_bench_size / 16) {
-    std::cout << std::setw(7) << s / 1024 << 'K';
-    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
-              << ghost_cache.get_hit_rate(s) * 100 << '%';
-    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
-              << sample_ghost_cache.get_hit_rate(s) * 100 << "%\n";
+    std::cout << std::setw(7) << s / 1024 << "K ";
+    ghost_cache.get_stat(s).print(std::cout, 8);
+    std::cout << ' ';
+    sample_ghost_cache.get_stat(s).print(std::cout, 8);
+    std::cout << '\n';
   }
-  std::cout << "========================================\n";
+  std::cout
+      << "================================================================\n";
+  std::cout << std::flush;
 }
 
 int main() {

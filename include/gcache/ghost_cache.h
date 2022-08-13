@@ -50,17 +50,28 @@ class CacheStat {
   uint64_t hit_cnt;
 
  public:
+  CacheStat() : acc_cnt(0), hit_cnt(0) {}
   void add_hit() {
     acc_cnt++;
     hit_cnt++;
   }
   void add_miss() { acc_cnt++; }
   double get_hit_rate() const { return double(hit_cnt) / double(acc_cnt); }
+  void reset() {
+    acc_cnt = 0;
+    hit_cnt = 0;
+  }
+
+  std::ostream& print(std::ostream& os, int width = 0) const {
+    return os << std::setw(6) << std::fixed << std::setprecision(2)
+              << get_hit_rate() * 100 << "% (" << std::setw(width) << std::fixed
+              << hit_cnt << '/' << std::setw(width) << std::fixed << acc_cnt
+              << ')';
+  }
 
   // print for debugging
   friend std::ostream& operator<<(std::ostream& os, const CacheStat& s) {
-    return os << std::setprecision(3) << s.get_hit_rate() * 100 << "% ("
-              << s.hit_cnt << '/' << s.acc_cnt << ')';
+    return s.print(os, 0);
   }
 };
 
@@ -88,26 +99,35 @@ class GhostCache {
   void access_impl(uint32_t page_id, uint32_t hash);
 
  public:
-  GhostCache(uint32_t tick, uint32_t begin_size, uint32_t end_size)
+  GhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
       : tick(tick),
-        min_size(begin_size),
-        max_size(((end_size - begin_size) / tick) * tick + begin_size),
-        num_ticks((end_size - begin_size) / tick + 1),
+        min_size(min_size),
+        max_size(max_size),
+        num_ticks((max_size - min_size) / tick + 1),
         lru_size(0),
         cache(),
         size_boundaries(num_ticks, nullptr),
         caches_stat(num_ticks) {
     assert(tick > 0);
-    assert(begin_size > 1);  // otherwise the first boundary will be LRU evicted
+    assert(min_size > 1);  // otherwise the first boundary will be LRU evicted
     assert(min_size + (num_ticks - 1) * tick == max_size);
     cache.init(max_size);
   }
   void access(uint32_t page_id) { access_impl(page_id, gcache_hash(page_id)); }
 
   double get_hit_rate(uint32_t cache_size) {
+    return get_stat(cache_size).get_hit_rate();
+  }
+
+  const CacheStat& get_stat(uint32_t cache_size) {
     assert((cache_size - min_size) % tick == 0);
     uint32_t size_idx = (cache_size - min_size) / tick;
-    return caches_stat[size_idx].get_hit_rate();
+    assert(size_idx < num_ticks);
+    return caches_stat[size_idx];
+  }
+
+  void reset_stat() {
+    for (auto& s : caches_stat) s.reset();
   }
 
   std::ostream& print(std::ostream& os, int indent = 0) const;
@@ -120,12 +140,12 @@ class GhostCache {
 template <uint32_t SampleShift = 5>
 class SampleGhostCache : public GhostCache {
  public:
-  SampleGhostCache(uint32_t tick, uint32_t begin_size, uint32_t end_size)
-      : GhostCache(tick >> SampleShift, begin_size >> SampleShift,
-                   end_size >> SampleShift) {
+  SampleGhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
+      : GhostCache(tick >> SampleShift, min_size >> SampleShift,
+                   max_size >> SampleShift) {
     assert(tick % (1 << SampleShift) == 0);
-    assert(begin_size % (1 << SampleShift) == 0);
-    assert(end_size % (1 << SampleShift) == 0);
+    assert(min_size % (1 << SampleShift) == 0);
+    assert(max_size % (1 << SampleShift) == 0);
     // Left few bits used for sampling; right few used for hash.
     // Make sure they never overlap.
     assert(std::countr_zero<uint32_t>(std::bit_ceil<uint32_t>(max_size)) <=
@@ -139,10 +159,15 @@ class SampleGhostCache : public GhostCache {
   }
 
   double get_hit_rate(uint32_t cache_size) {
+    return get_stat(cache_size).get_hit_rate();
+  }
+
+  const CacheStat& get_stat(uint32_t cache_size) {
     cache_size >>= SampleShift;
     assert((cache_size - min_size) % tick == 0);
     uint32_t size_idx = (cache_size - min_size) / tick;
-    return caches_stat[size_idx].get_hit_rate();
+    assert(size_idx < num_ticks);
+    return caches_stat[size_idx];
   }
 };
 

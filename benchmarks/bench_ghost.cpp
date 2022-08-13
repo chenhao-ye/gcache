@@ -22,20 +22,21 @@ void test1() {
   ghost_cache.access(1);
   ghost_cache.access(2);
   ghost_cache.access(3);
-  std::cout << "Expect: Boundaries: [1, 0, (null)]; Stat: [0/4, 0/4, 0/4]\n";
+  std::cout
+      << "Expect: Boundaries: [1, 0, (null), (null)]; Stat: [0/4, 0/4, 0/4]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(4);
   ghost_cache.access(5);
-  std::cout << "Expect: Boundaries: [3, 2, 1]; Stat: [0/6, 0/6, 0/6]\n";
+  std::cout << "Expect: Boundaries: [3, 2, 1, 0]; Stat: [0/6, 0/6, 0/6]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(2);
-  std::cout << "Expect: Boundaries: [4, 3, 1]; Stat: [0/7, 1/7, 1/7]\n";
+  std::cout << "Expect: Boundaries: [4, 3, 1, 0]; Stat: [0/7, 1/7, 1/7]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(4);
-  std::cout << "Expect: Boundaries: [5, 3, 1]; Stat: [1/8, 2/8, 2/8]\n";
+  std::cout << "Expect: Boundaries: [5, 3, 1, 0]; Stat: [1/8, 2/8, 2/8]\n";
   std::cout << ghost_cache;
 }
 

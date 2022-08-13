@@ -183,13 +183,13 @@ void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
     else
       size_idx = (lru_size - min_size + tick - 1) / tick;
     if (size_idx < num_ticks && lru_size - min_size == size_idx * tick)
-      size_boundaries[size_idx] = cache.lru_.next;
+      size_boundaries[size_idx] = cache.get_lru_handle();
   }
   for (uint32_t i = 0; i < size_idx; ++i) {
     auto& b = size_boundaries[i];
     if (!b) continue;
     b->value++;
-    b = b->next;
+    b = cache.get_list_next(b);
   }
   if (s) {
     for (uint32_t i = 0; i < size_idx; ++i) caches_stat[i].add_miss();

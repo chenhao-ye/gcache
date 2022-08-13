@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 
 namespace gcache {
 // LRU cache implementation
@@ -33,14 +34,18 @@ template <typename Key_t, typename Value_t>
 class LRUCache;
 class GhostCache;
 
+typedef uint32_t handle_idx_t;
+constexpr static const uint32_t INVALID_IDX =
+    std::numeric_limits<uint32_t>::max();
+
 // An entry is a variable length heap-allocated structure.  Entries
 // are kept in a circular doubly linked list ordered by access time.
 template <typename Key_t, typename Value_t>
 class LRUHandle {
  private:
-  LRUHandle* next_hash;
-  LRUHandle* next;
-  LRUHandle* prev;
+  handle_idx_t next_hash;
+  handle_idx_t next;
+  handle_idx_t prev;
   uint32_t refs;  // References, including cache reference, if present.
 
   friend class HandleTable<Key_t, Value_t>;
@@ -63,30 +68,8 @@ class LRUHandle {
     return os << h.key << ": " << h.value << " (refs=" << h.refs
               << ", hash=" << h.hash << ")";
   }
-
-  // print a list; this must be a dummpy list head
-  std::ostream& print_list(std::ostream& os) const {
-    auto h = next;
-    if (h == this) return os;
-    os << h->key;
-    assert(h == h->next->prev);
-    h = h->next;
-    while (h != this) {
-      os << ", " << h->key;
-      assert(h == h->next->prev);
-      h = h->next;
-    }
-    return os;
-  }
-
-  std::ostream& print_list_hash(std::ostream& os) const {
-    auto h = this;
-    while (h) {
-      os << '\t' << *h << ';';
-      h = h->next_hash;
-    }
-    os << '\n';
-    return os;
-  }
 };
+
+static_assert(sizeof(LRUHandle<uint32_t, void*>) == 32,
+              "Expect Handle<uint32_t, void*> to be exactly 32-byte");
 }  // namespace gcache

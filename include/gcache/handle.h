@@ -72,4 +72,8 @@ class LRUHandle {
 
 static_assert(sizeof(LRUHandle<uint32_t, void*>) == 32,
               "Expect Handle<uint32_t, void*> to be exactly 32-byte");
+// NOTE: Though 32-byte seems more cache-friendly, we find in our benchmark,
+// LRUCache<uint32_t, uint32_t> has better performance than LRUCache<uint32_t,
+// uint64_t>.
+
 }  // namespace gcache

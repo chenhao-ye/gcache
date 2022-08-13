@@ -143,7 +143,8 @@ void bench3() {
     sample_ghost_cache.access(i);
     reqs.emplace_back(i);
   }
-
+  ghost_cache.reset_stat();
+  sample_ghost_cache.reset_stat();
   std::shuffle(reqs.begin(), reqs.end(), std::default_random_engine());
 
   // cache hit
@@ -165,9 +166,9 @@ void bench3() {
       << "----------------------------------------------------------------\n";
   for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16) {
     std::cout << std::setw(7) << s / 1024 << "K ";
-    ghost_cache.get_cache_stat(s).print(std::cout, 8);
+    ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';
-    sample_ghost_cache.get_cache_stat(s).print(std::cout, 8);
+    sample_ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << '\n';
   }
   std::cout
@@ -187,7 +188,8 @@ void bench4() {
     sample_ghost_cache.access(i);
     reqs.emplace_back(i);
   }
-
+  ghost_cache.reset_stat();
+  sample_ghost_cache.reset_stat();
   std::shuffle(reqs.begin(), reqs.end(), std::default_random_engine());
 
   // cache hit
@@ -210,9 +212,9 @@ void bench4() {
   for (uint32_t s = large_bench_size / 16; s < large_bench_size;
        s += large_bench_size / 16) {
     std::cout << std::setw(7) << s / 1024 << "K ";
-    ghost_cache.get_cache_stat(s).print(std::cout, 8);
+    ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';
-    sample_ghost_cache.get_cache_stat(s).print(std::cout, 8);
+    sample_ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << '\n';
   }
   std::cout

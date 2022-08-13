@@ -57,6 +57,10 @@ class CacheStat {
   }
   void add_miss() { acc_cnt++; }
   double get_hit_rate() const { return double(hit_cnt) / double(acc_cnt); }
+  void reset() {
+    acc_cnt = 0;
+    hit_cnt = 0;
+  }
 
   std::ostream& print(std::ostream& os, int width = 0) const {
     return os << std::setw(6) << std::fixed << std::setprecision(3)
@@ -112,14 +116,18 @@ class GhostCache {
   void access(uint32_t page_id) { access_impl(page_id, gcache_hash(page_id)); }
 
   double get_hit_rate(uint32_t cache_size) {
-    return get_cache_stat(cache_size).get_hit_rate();
+    return get_stat(cache_size).get_hit_rate();
   }
 
-  const CacheStat& get_cache_stat(uint32_t cache_size) {
+  const CacheStat& get_stat(uint32_t cache_size) {
     assert((cache_size - min_size) % tick == 0);
     uint32_t size_idx = (cache_size - min_size) / tick;
     assert(size_idx < num_ticks);
     return caches_stat[size_idx];
+  }
+
+  void reset_stat() {
+    for (auto& s : caches_stat) s.reset();
   }
 
   std::ostream& print(std::ostream& os, int indent = 0) const;
@@ -151,10 +159,10 @@ class SampleGhostCache : public GhostCache {
   }
 
   double get_hit_rate(uint32_t cache_size) {
-    return get_cache_stat(cache_size).get_hit_rate();
+    return get_stat(cache_size).get_hit_rate();
   }
 
-  const CacheStat& get_cache_stat(uint32_t cache_size) {
+  const CacheStat& get_stat(uint32_t cache_size) {
     cache_size >>= SampleShift;
     assert((cache_size - min_size) % tick == 0);
     uint32_t size_idx = (cache_size - min_size) / tick;

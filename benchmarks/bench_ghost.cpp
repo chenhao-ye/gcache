@@ -10,9 +10,9 @@
 #include "util.h"
 
 using namespace gcache;
-constexpr const uint32_t num_ops = 1024 * 1024 * 16;
-constexpr const uint32_t bench_size = 256 * 1024;
-constexpr const uint32_t large_bench_size = 1024 * 1024;  // 4 GB cache
+constexpr const uint32_t num_ops = 1024 * 1024 * 32;
+constexpr const uint32_t bench_size = 256 * 1024;             // 1 GB cache
+constexpr const uint32_t large_bench_size = 2 * 1024 * 1024;  // 8 GB cache
 
 void test1() {
   GhostCache ghost_cache(1, 3, 6);

@@ -97,6 +97,7 @@ void test() {
   h7->value = 777;
   std::cout << "\n=== Expect: lru: [3, 6, 5, 7], in_use: [] ===\n";
   std::cout << cache;
+  std::cout << std::flush;
 }
 
 void bench() {
@@ -120,6 +121,7 @@ void bench() {
   std::cout << "Fill: " << (ts1 - ts0) / (256 * 1024) << " cycles/op\n";
   std::cout << "Hit:  " << (ts2 - ts1) / (256 * 1024) << " cycles/op\n";
   std::cout << "Miss: " << (ts3 - ts2) / (256 * 1024) << " cycles/op\n";
+  std::cout << std::flush;
 }
 
 int main() {

@@ -63,7 +63,7 @@ class CacheStat {
   }
 
   std::ostream& print(std::ostream& os, int width = 0) const {
-    return os << std::setw(6) << std::fixed << std::setprecision(3)
+    return os << std::setw(6) << std::fixed << std::setprecision(2)
               << get_hit_rate() * 100 << "% (" << std::setw(width) << std::fixed
               << hit_cnt << '/' << std::setw(width) << std::fixed << acc_cnt
               << ')';

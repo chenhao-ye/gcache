@@ -99,17 +99,17 @@ class GhostCache {
   void access_impl(uint32_t page_id, uint32_t hash);
 
  public:
-  GhostCache(uint32_t tick, uint32_t begin_size, uint32_t end_size)
+  GhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
       : tick(tick),
-        min_size(begin_size),
-        max_size(((end_size - begin_size) / tick) * tick + begin_size),
-        num_ticks((end_size - begin_size) / tick + 1),
+        min_size(min_size),
+        max_size(max_size),
+        num_ticks((max_size - min_size) / tick + 1),
         lru_size(0),
         cache(),
         size_boundaries(num_ticks, nullptr),
         caches_stat(num_ticks) {
     assert(tick > 0);
-    assert(begin_size > 1);  // otherwise the first boundary will be LRU evicted
+    assert(min_size > 1);  // otherwise the first boundary will be LRU evicted
     assert(min_size + (num_ticks - 1) * tick == max_size);
     cache.init(max_size);
   }
@@ -140,12 +140,12 @@ class GhostCache {
 template <uint32_t SampleShift = 5>
 class SampleGhostCache : public GhostCache {
  public:
-  SampleGhostCache(uint32_t tick, uint32_t begin_size, uint32_t end_size)
-      : GhostCache(tick >> SampleShift, begin_size >> SampleShift,
-                   end_size >> SampleShift) {
+  SampleGhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
+      : GhostCache(tick >> SampleShift, min_size >> SampleShift,
+                   max_size >> SampleShift) {
     assert(tick % (1 << SampleShift) == 0);
-    assert(begin_size % (1 << SampleShift) == 0);
-    assert(end_size % (1 << SampleShift) == 0);
+    assert(min_size % (1 << SampleShift) == 0);
+    assert(max_size % (1 << SampleShift) == 0);
     // Left few bits used for sampling; right few used for hash.
     // Make sure they never overlap.
     assert(std::countr_zero<uint32_t>(std::bit_ceil<uint32_t>(max_size)) <=

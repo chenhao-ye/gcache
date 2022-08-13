@@ -41,7 +41,7 @@ void test1() {
 }
 
 void test2() {
-  GhostCache ghost_cache(2, 2, 7);
+  GhostCache ghost_cache(2, 2, 6);
   std::cout << "=== Test 2 ===\n";
 
   ghost_cache.access(0);
@@ -165,7 +165,7 @@ void bench3() {
       << "  size          w/o sampling                 w/ sampling        \n";
   std::cout
       << "----------------------------------------------------------------\n";
-  for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16) {
+  for (uint32_t s = bench_size / 16; s <= bench_size; s += bench_size / 16) {
     std::cout << std::setw(7) << s / 1024 << "K ";
     ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';
@@ -210,7 +210,7 @@ void bench4() {
       << "  size          w/o sampling                 w/ sampling        \n";
   std::cout
       << "----------------------------------------------------------------\n";
-  for (uint32_t s = large_bench_size / 16; s < large_bench_size;
+  for (uint32_t s = large_bench_size / 16; s <= large_bench_size;
        s += large_bench_size / 16) {
     std::cout << std::setw(7) << s / 1024 << "K ";
     ghost_cache.get_stat(s).print(std::cout, 8);

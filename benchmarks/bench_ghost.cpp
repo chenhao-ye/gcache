@@ -10,7 +10,7 @@
 #include "util.h"
 
 using namespace gcache;
-constexpr const uint32_t num_ops = 1024 * 1024 * 32;
+constexpr const uint32_t num_ops = 32 * 1024 * 1024;
 constexpr const uint32_t bench_size = 256 * 1024;             // 1 GB cache
 constexpr const uint32_t large_bench_size = 2 * 1024 * 1024;  // 8 GB cache
 
@@ -137,7 +137,8 @@ void bench3() {
 
   // filling the cache
   std::vector<uint32_t> reqs;
-  for (uint32_t i = 0; i < bench_size + bench_size / 2; ++i) {
+  // working set is 1.2x of max cache size
+  for (uint32_t i = 0; i < bench_size + bench_size / 4; ++i) {
     ghost_cache.access(i);
     sample_ghost_cache.access(i);
     reqs.emplace_back(i);
@@ -179,7 +180,7 @@ void bench4() {
 
   // filling the cache
   std::vector<uint32_t> reqs;
-  for (uint32_t i = 0; i < large_bench_size + large_bench_size / 2; ++i) {
+  for (uint32_t i = 0; i < large_bench_size + large_bench_size / 4; ++i) {
     ghost_cache.access(i);
     sample_ghost_cache.access(i);
     reqs.emplace_back(i);

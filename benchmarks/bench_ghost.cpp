@@ -149,27 +149,29 @@ void bench3() {
   // cache hit
   auto ts0 = rdtsc();
   for (uint32_t op = 0; op < num_ops; op++)
-    ghost_cache.access(reqs[op % bench_size]);
+    ghost_cache.access(reqs[op % reqs.size()]);
   auto ts1 = rdtsc();
   for (uint32_t op = 0; op < num_ops; op++)
-    sample_ghost_cache.access(reqs[op % bench_size]);
+    sample_ghost_cache.access(reqs[op % reqs.size()]);
   auto ts2 = rdtsc();
 
   std::cout << "=== Bench 3 ===\n";
   std::cout << "w/o sampling: " << (ts1 - ts0) / num_ops << " cycles/op\n";
   std::cout << "w/ sampling:  " << (ts2 - ts1) / num_ops << " cycles/op\n";
-  std::cout << "=============== Hit Rate ===============\n";
-  std::cout << std::setw(8) << "size" << std::setw(16) << "w/o sampling"
-            << std::setw(16) << "w/ sampling" << '\n';
-  std::cout << "----------------------------------------\n";
+  std::cout
+      << "=========================== Hit Rate ===========================\n"
+      << "  size          w/o sampling                 w/ sampling        \n";
+  std::cout
+      << "----------------------------------------------------------------\n";
   for (uint32_t s = bench_size / 16; s < bench_size; s += bench_size / 16) {
-    std::cout << std::setw(7) << s / 1024 << 'K';
-    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
-              << ghost_cache.get_hit_rate(s) * 100 << '%';
-    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
-              << sample_ghost_cache.get_hit_rate(s) * 100 << "%\n";
+    std::cout << std::setw(7) << s / 1024 << "K ";
+    ghost_cache.get_cache_stat(s).print(std::cout, 8);
+    std::cout << ' ';
+    sample_ghost_cache.get_cache_stat(s).print(std::cout, 8);
+    std::cout << '\n';
   }
-  std::cout << "========================================\n";
+  std::cout
+      << "================================================================\n";
 }
 
 void bench4() {
@@ -191,28 +193,30 @@ void bench4() {
   // cache hit
   auto ts0 = rdtsc();
   for (uint32_t op = 0; op < num_ops; op++)
-    ghost_cache.access(reqs[op % large_bench_size]);
+    ghost_cache.access(reqs[op % reqs.size()]);
   auto ts1 = rdtsc();
   for (uint32_t op = 0; op < num_ops; op++)
-    sample_ghost_cache.access(reqs[op % large_bench_size]);
+    sample_ghost_cache.access(reqs[op % reqs.size()]);
   auto ts2 = rdtsc();
 
   std::cout << "=== Bench 4 ===\n";
   std::cout << "w/o sampling: " << (ts1 - ts0) / num_ops << " cycles/op\n";
   std::cout << "w/ sampling:  " << (ts2 - ts1) / num_ops << " cycles/op\n";
-  std::cout << "=============== Hit Rate ===============\n";
-  std::cout << std::setw(8) << "size" << std::setw(16) << "w/o sampling"
-            << std::setw(16) << "w/ sampling" << '\n';
-  std::cout << "----------------------------------------\n";
+  std::cout
+      << "=========================== Hit Rate ===========================\n"
+      << "  size          w/o sampling                 w/ sampling        \n";
+  std::cout
+      << "----------------------------------------------------------------\n";
   for (uint32_t s = large_bench_size / 16; s < large_bench_size;
        s += large_bench_size / 16) {
-    std::cout << std::setw(7) << s / 1024 << 'K';
-    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
-              << ghost_cache.get_hit_rate(s) * 100 << '%';
-    std::cout << std::setw(15) << std::fixed << std::setprecision(3)
-              << sample_ghost_cache.get_hit_rate(s) * 100 << "%\n";
+    std::cout << std::setw(7) << s / 1024 << "K ";
+    ghost_cache.get_cache_stat(s).print(std::cout, 8);
+    std::cout << ' ';
+    sample_ghost_cache.get_cache_stat(s).print(std::cout, 8);
+    std::cout << '\n';
   }
-  std::cout << "========================================\n";
+  std::cout
+      << "================================================================\n";
 }
 
 int main() {

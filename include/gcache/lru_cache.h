@@ -88,7 +88,8 @@ class LRUCache {
 };
 
 template <typename Key_t, typename Value_t>
-LRUCache<Key_t, Value_t>::LRUCache() : capacity_(0), pool_(nullptr), table_() {
+inline LRUCache<Key_t, Value_t>::LRUCache()
+    : capacity_(0), pool_(nullptr), table_() {
   // Make empty circular linked lists.
   lru_.next = &lru_;
   lru_.prev = &lru_;
@@ -98,7 +99,7 @@ LRUCache<Key_t, Value_t>::LRUCache() : capacity_(0), pool_(nullptr), table_() {
 }
 
 template <typename Key_t, typename Value_t>
-LRUCache<Key_t, Value_t>::~LRUCache() {
+inline LRUCache<Key_t, Value_t>::~LRUCache() {
   assert(in_use_.next == &in_use_);  // Error if caller has an unreleased handle
   // Unnecessary for correctness, but kept to ease debugging
   for (const Handle_t* e = lru_.next; e != &lru_; e = e->next)
@@ -107,7 +108,7 @@ LRUCache<Key_t, Value_t>::~LRUCache() {
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::init(size_t capacity) {
+inline void LRUCache<Key_t, Value_t>::init(size_t capacity) {
   assert(!capacity_ && !pool_);
   assert(capacity);
   capacity_ = capacity;
@@ -125,8 +126,8 @@ void LRUCache<Key_t, Value_t>::init(size_t capacity) {
 }
 
 template <typename Key_t, typename Value_t>
-typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
-    Key_t key, uint32_t hash, bool pin) {
+inline typename LRUCache<Key_t, Value_t>::Handle_t*
+LRUCache<Key_t, Value_t>::insert(Key_t key, uint32_t hash, bool pin) {
   // Disable support for capacity_ == 0; the user must set capacity first
   assert(capacity_ > 0 && pool_);
 
@@ -155,21 +156,22 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::insert(
 }
 
 template <typename Key_t, typename Value_t>
-typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::lookup(
-    Key_t key, uint32_t hash, bool pin) {
+inline typename LRUCache<Key_t, Value_t>::Handle_t*
+LRUCache<Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
   Handle_t* e = table_.lookup(key, hash);
   if (e && pin) ref(e);
   return e;
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::release(Handle_t* handle) {
+inline void LRUCache<Key_t, Value_t>::release(Handle_t* handle) {
   unref(handle);
 }
 
 template <typename Key_t, typename Value_t>
-typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::touch(
-    Key_t key, uint32_t hash, Handle_t*& successor) {
+inline typename LRUCache<Key_t, Value_t>::Handle_t*
+LRUCache<Key_t, Value_t>::touch(Key_t key, uint32_t hash,
+                                Handle_t*& successor) {
   // Disable support for capacity_ == 0; the user must set capacity first
   assert(capacity_ > 0 && pool_);
 
@@ -191,7 +193,7 @@ typename LRUCache<Key_t, Value_t>::Handle_t* LRUCache<Key_t, Value_t>::touch(
 }
 
 template <typename Key_t, typename Value_t>
-typename LRUCache<Key_t, Value_t>::Handle_t*
+inline typename LRUCache<Key_t, Value_t>::Handle_t*
 LRUCache<Key_t, Value_t>::alloc_handle() {
   if (free_.next != &free_) {  // Allocate from free list
     Handle_t* e = free_.next;
@@ -211,12 +213,12 @@ LRUCache<Key_t, Value_t>::alloc_handle() {
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::free_handle(Handle_t* e) {
+inline void LRUCache<Key_t, Value_t>::free_handle(Handle_t* e) {
   list_append(&free_, e);
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::ref(Handle_t* e) {
+inline void LRUCache<Key_t, Value_t>::ref(Handle_t* e) {
   if (e->refs == 1) {  // If on lru_ list, move to in_use_ list.
     list_remove(e);
     list_append(&in_use_, e);
@@ -225,7 +227,7 @@ void LRUCache<Key_t, Value_t>::ref(Handle_t* e) {
 }
 
 template <typename Key_t, typename Value_t>
-void LRUCache<Key_t, Value_t>::unref(Handle_t* e) {
+inline void LRUCache<Key_t, Value_t>::unref(Handle_t* e) {
   assert(e->refs > 0);
   e->refs--;
   if (e->refs == 0) {  // Deallocate.

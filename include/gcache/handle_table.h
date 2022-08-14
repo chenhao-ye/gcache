@@ -47,7 +47,7 @@ class HandleTable {
 };
 
 template <typename Key_t, typename Value_t>
-void HandleTable<Key_t, Value_t>::insert(Handle_t* e) {
+inline void HandleTable<Key_t, Value_t>::insert(Handle_t* e) {
   // Caller must ensure e->key does not present in the table!
   assert(!lookup(e->key, e->value));
   // Add to the head of this linked list
@@ -57,14 +57,14 @@ void HandleTable<Key_t, Value_t>::insert(Handle_t* e) {
 }
 
 template <typename Key_t, typename Value_t>
-typename HandleTable<Key_t, Value_t>::Handle_t*
+inline typename HandleTable<Key_t, Value_t>::Handle_t*
 HandleTable<Key_t, Value_t>::lookup(Key_t key, uint32_t hash) {
   assert(length_ > 0);
   return *find_pointer(key, hash);
 }
 
 template <typename Key_t, typename Value_t>
-typename HandleTable<Key_t, Value_t>::Handle_t*
+inline typename HandleTable<Key_t, Value_t>::Handle_t*
 HandleTable<Key_t, Value_t>::remove(Key_t key, uint32_t hash) {
   assert(length_ > 0);
   Handle_t** ptr = find_pointer(key, hash);
@@ -77,7 +77,7 @@ HandleTable<Key_t, Value_t>::remove(Key_t key, uint32_t hash) {
 // matches key/hash.  If there is no such cache entry, return a
 // pointer to the trailing slot in the corresponding linked list.
 template <typename Key_t, typename Value_t>
-typename HandleTable<Key_t, Value_t>::Handle_t**
+inline typename HandleTable<Key_t, Value_t>::Handle_t**
 HandleTable<Key_t, Value_t>::find_pointer(Key_t key, uint32_t hash) {
   Handle_t** ptr = &list_[hash & (length_ - 1)];
   while (*ptr != nullptr && ((*ptr)->hash != hash || key != (*ptr)->key)) {
@@ -87,7 +87,7 @@ HandleTable<Key_t, Value_t>::find_pointer(Key_t key, uint32_t hash) {
 }
 
 template <typename Key_t, typename Value_t>
-void HandleTable<Key_t, Value_t>::reserve(size_t size) {
+inline void HandleTable<Key_t, Value_t>::reserve(size_t size) {
   size = std::bit_ceil<size_t>(size);
   length_ = size;
   list_ = new Handle_t*[length_];
@@ -95,8 +95,8 @@ void HandleTable<Key_t, Value_t>::reserve(size_t size) {
 }
 
 template <typename Key_t, typename Value_t>
-std::ostream& HandleTable<Key_t, Value_t>::print(std::ostream& os,
-                                                 int indent) const {
+inline std::ostream& HandleTable<Key_t, Value_t>::print(std::ostream& os,
+                                                        int indent) const {
   os << "HandleTable (length=" << length_ << ") {\n";
   for (size_t i = 0; i < length_; ++i) {
     auto h = list_[i];

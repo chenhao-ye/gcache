@@ -174,7 +174,7 @@ class SampleGhostCache : public GhostCache {
 /**
  * When using ghost cache, we assume in_use list is always empty.
  */
-void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
+inline void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
   uint32_t size_idx;
   Handle_t* s;  // successor
   Handle_t* h = cache.touch(page_id, hash, s);
@@ -226,7 +226,7 @@ void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
   h->value = 0;
 }
 
-std::ostream& GhostCache::print(std::ostream& os, int indent) const {
+inline std::ostream& GhostCache::print(std::ostream& os, int indent) const {
   os << "GhostCache (tick=" << tick << ", min=" << min_size
      << ", max=" << max_size << ", num_ticks=" << num_ticks
      << ", lru_size=" << lru_size << ") {\n";

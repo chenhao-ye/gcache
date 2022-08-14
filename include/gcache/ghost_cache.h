@@ -20,7 +20,7 @@ namespace gcache {
 
 // From XXHash:
 // https://github.com/Cyan4973/xxHash/blob/release/xxhash.h#L1968
-uint32_t xxhash_u32(uint32_t x) {
+static inline uint32_t xxhash_u32(uint32_t x) {
   x ^= x >> 15;
   x *= 0x85EBCA77U;
   x ^= x >> 13;
@@ -31,7 +31,7 @@ uint32_t xxhash_u32(uint32_t x) {
 
 // From MurmurHash:
 // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp#L68
-uint32_t murmurhash_u32(uint32_t x) {
+static inline uint32_t murmurhash_u32(uint32_t x) {
   x ^= x >> 16;
   x *= 0x85ebca6b;
   x ^= x >> 13;

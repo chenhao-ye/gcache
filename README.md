@@ -1,7 +1,7 @@
-# Gcache
+# gcache
 
-Gcache is an extremely fast header-only library for ghost cache.
+gcache is an extremely fast header-only library for ghost cache.
 
 ## Credits
 
-Gcache is based on the LRU page cache implementation from Google's [LevelDB](https://github.com/google/leveldb).
+gcache is based on the LRU page cache implementation from Google's [LevelDB](https://github.com/google/leveldb).

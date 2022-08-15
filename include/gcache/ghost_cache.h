@@ -3,6 +3,7 @@
 #include <nmmintrin.h>  // for _mm_crc32_u32 instruction
 
 #include <bit>
+#include <cassert>
 #include <cstdint>
 #include <functional>
 #include <iomanip>
@@ -118,6 +119,10 @@ class GhostCache {
   double get_hit_rate(uint32_t cache_size) const {
     return get_stat(cache_size).get_hit_rate();
   }
+
+  uint32_t get_tick() { return tick; }
+  uint32_t get_min_size() { return min_size; }
+  uint32_t get_max_size() { return max_size; }
 
   const CacheStat& get_stat(uint32_t cache_size) const {
     assert((cache_size - min_size) % tick == 0);

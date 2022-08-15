@@ -120,9 +120,9 @@ class GhostCache {
     return get_stat(cache_size).get_hit_rate();
   }
 
-  uint32_t get_tick() { return tick; }
-  uint32_t get_min_size() { return min_size; }
-  uint32_t get_max_size() { return max_size; }
+  uint32_t get_tick() const { return tick; }
+  uint32_t get_min_size() const { return min_size; }
+  uint32_t get_max_size() const { return max_size; }
 
   const CacheStat& get_stat(uint32_t cache_size) const {
     assert((cache_size - min_size) % tick == 0);

@@ -135,15 +135,17 @@ class GhostCache {
   }
   void access(uint32_t page_id) { access_impl(page_id, gcache_hash(page_id)); }
 
-  double get_hit_rate(uint32_t cache_size) const {
-    return get_stat(cache_size).get_hit_rate();
-  }
-
   uint32_t get_tick() const { return tick; }
   uint32_t get_min_size() const { return min_size; }
   uint32_t get_max_size() const { return max_size; }
 
+  double get_hit_rate(uint32_t cache_size) const {
+    return get_stat(cache_size).get_hit_rate();
+  }
+
   const CacheStat& get_stat(uint32_t cache_size) const {
+    assert(cache_size >= min_size);
+    assert(cache_size <= max_size);
     assert((cache_size - min_size) % tick == 0);
     uint32_t size_idx = (cache_size - min_size) / tick;
     assert(size_idx < num_ticks);
@@ -182,12 +184,18 @@ class SampleGhostCache : public GhostCache {
     if ((hash >> (32 - SampleShift)) == 0) access_impl(page_id, hash);
   }
 
+  uint32_t get_tick() const { return tick << SampleShift; }
+  uint32_t get_min_size() const { return min_size << SampleShift; }
+  uint32_t get_max_size() const { return max_size << SampleShift; }
+
   double get_hit_rate(uint32_t cache_size) const {
     return get_stat(cache_size).get_hit_rate();
   }
 
   const CacheStat& get_stat(uint32_t cache_size) const {
     cache_size >>= SampleShift;
+    assert(cache_size >= min_size);
+    assert(cache_size <= max_size);
     assert((cache_size - min_size) % tick == 0);
     uint32_t size_idx = (cache_size - min_size) / tick;
     assert(size_idx < num_ticks);

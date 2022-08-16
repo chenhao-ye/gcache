@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -245,6 +246,54 @@ void bench4() {
   std::cout << std::flush;
 }
 
+void bench5() {
+  GhostCache ghost_cache(large_bench_size / 16, large_bench_size / 16,
+                         large_bench_size);
+  SampleGhostCache<5> sample_ghost_cache(
+      large_bench_size / 16, large_bench_size / 16, large_bench_size);
+
+  // filling the cache
+  std::vector<uint32_t> reqs;
+  for (uint32_t i = 0; i < large_bench_size; ++i) {
+    ghost_cache.access(i);
+    sample_ghost_cache.access(i);
+  }
+  for (uint32_t i = 0; i < num_ops; ++i)
+    reqs.emplace_back(rand() % large_bench_size);
+  ghost_cache.reset_stat();
+  sample_ghost_cache.reset_stat();
+  std::random_shuffle(reqs.begin(), reqs.end());
+
+  uint64_t ts0;
+  ts0 = rdtsc();
+  for (auto i : reqs) ghost_cache.access(i);
+  uint64_t elapse_g = rdtsc() - ts0;
+
+  ts0 = rdtsc();
+  for (auto i : reqs) sample_ghost_cache.access(i);
+  uint64_t elapse_s = rdtsc() - ts0;
+
+  std::cout << "=== Bench 5 ===\n";
+  std::cout << "w/o sampling: " << elapse_g / num_ops << " cycles/op\n";
+  std::cout << "w/ sampling:  " << elapse_s / num_ops << " cycles/op\n";
+  std::cout
+      << "=========================== Hit Rate ===========================\n"
+      << "  size          w/o sampling                 w/ sampling        \n";
+  std::cout
+      << "----------------------------------------------------------------\n";
+  for (uint32_t s = large_bench_size / 16; s <= large_bench_size;
+       s += large_bench_size / 16) {
+    std::cout << std::setw(7) << s / 1024 << "K ";
+    ghost_cache.get_stat(s).print(std::cout, 8);
+    std::cout << ' ';
+    sample_ghost_cache.get_stat(s).print(std::cout, 8);
+    std::cout << '\n';
+  }
+  std::cout
+      << "================================================================\n";
+  std::cout << std::flush;
+}
+
 int main() {
   test1();
   test2();
@@ -252,5 +301,6 @@ int main() {
   bench2();  // ghost cache w/ sampling
   bench3();  // hit rate comparsion
   bench4();  // large bench: may exceed CPU cache size
+  bench5();  // real random access
   return 0;
 }

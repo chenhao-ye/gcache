@@ -12,6 +12,7 @@
 #include "gcache/handle.h"
 #include "gcache/handle_table.h"
 #include "gcache/lru_cache.h"
+
 namespace gcache {
 
 /**

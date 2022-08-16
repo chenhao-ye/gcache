@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <iomanip>
+#include <limits>
 #include <vector>
 
 #include "gcache/handle.h"
@@ -58,13 +59,30 @@ class CacheStat {
     hit_cnt++;
   }
   void add_miss() { acc_cnt++; }
-  double get_hit_rate() const { return double(hit_cnt) / double(acc_cnt); }
+
+  // we may read an inconsistent version if the reader thread is not the writer,
+  // but most inaccuracy is tolerable, unless it produces a unreasonable value,
+  // e.g., hit_rate > 100%.
+  // we don't use atomic here because we find it is too expensive.
+  double get_hit_rate() const {
+    uint64_t h, a;
+  retry:
+    h = hit_cnt;
+    a = acc_cnt;
+    // this means we read a problematic inconsistent version
+    if (h > a) goto retry;
+    if (a == 0) return std::numeric_limits<double>::infinity();
+    return double(hit_cnt) / double(acc_cnt);
+  }
   void reset() {
     acc_cnt = 0;
     hit_cnt = 0;
   }
 
   std::ostream& print(std::ostream& os, int width = 0) const {
+    if (acc_cnt == 0)
+      return os << "    NAN (" << std::setw(width) << std::fixed << hit_cnt
+                << '/' << std::setw(width) << std::fixed << acc_cnt << ')';
     return os << std::setw(6) << std::fixed << std::setprecision(2)
               << get_hit_rate() * 100 << "% (" << std::setw(width) << std::fixed
               << hit_cnt << '/' << std::setw(width) << std::fixed << acc_cnt

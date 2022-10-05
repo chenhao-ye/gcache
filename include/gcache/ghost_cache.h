@@ -176,6 +176,7 @@ class SampleGhostCache : public GhostCache {
     // Make sure they never overlap.
     assert(std::countr_zero<uint32_t>(std::bit_ceil<uint32_t>(max_size)) <=
            32 - static_cast<int>(SampleShift));
+    assert(this->tick > 0);
   }
 
   // Only update ghost cache if the first few bits of hash is all zero

@@ -15,6 +15,9 @@ class SharedCache {
   struct TaggedValue_t {
     Tag_t tag;
     Value_t value;
+    friend std::ostream& operator<<(std::ostream& os, const TaggedValue_t& tv) {
+      return os << "(" << tv.tag << ", " << tv.value << ")";
+    }
   };
   typedef LRUHandle<Key_t, TaggedValue_t> Handle_t;
   SharedCache() : pool_(nullptr), tenant_cache_map_(), key_cache_map_(){};
@@ -31,6 +34,9 @@ class SharedCache {
   Handle_t* insert(Tag_t tag, Key_t key, uint32_t hash, bool pin = false);
   // Search for a handle; return nullptr if not exist; no tag required because
   // there is no insertion may happen
+  // FIXME: However, this op will refresh LRU list, so a tenant A could
+  // repeatedly access a cache slot previously accessed by B and keep this slot
+  // in memory, even though B does not use it anymore
   Handle_t* lookup(Key_t key, uint32_t hash, bool pin = false);
   // Release pinned handle returned by insert/lookup
   void release(Handle_t* handle);
@@ -91,6 +97,7 @@ SharedCache<Tag_t, Key_t, Value_t>::insert(Tag_t tag, Key_t key, uint32_t hash,
   auto cache = it->second;
   e = cache->insert(key, hash, pin, /*not_exist*/ true);
   if (!e) return nullptr;
+  e->value.tag = tag;
   key_cache_map_.emplace(key, cache);
   return e;
 }
@@ -106,7 +113,7 @@ SharedCache<Tag_t, Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
 template <typename Tag_t, typename Key_t, typename Value_t>
 void SharedCache<Tag_t, Key_t, Value_t>::release(
     typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t* handle) {
-  Tag_t tag = handle->value->tag;
+  Tag_t tag = handle->value.tag;
   auto it = tenant_cache_map_.find(tag);
   assert(it != tenant_cache_map_.end());
   it->second->release(handle);
@@ -136,10 +143,10 @@ std::ostream& SharedCache<Tag_t, Key_t, Value_t>::print(std::ostream& os,
                                                         int indent) const {
   os << "Tenant Cache Map {" << std::endl;
   for (auto [tag, cache] : tenant_cache_map_) {
-    for (int i = 0; i < indent; ++i) os << '\t';
-    os << "Tenant (tag=" << tag << ", cache=" << cache << ") {\n";
     for (int i = 0; i < indent + 1; ++i) os << '\t';
-    cache->print(indent + 1);
+    os << "Tenant (tag=" << tag << ", cache=" << cache << ") {\n";
+    for (int i = 0; i < indent + 2; ++i) os << '\t';
+    cache->print(os, indent + 2);
     for (int i = 0; i < indent + 1; ++i) os << '\t';
     os << "}\n";
   }
@@ -149,7 +156,7 @@ std::ostream& SharedCache<Tag_t, Key_t, Value_t>::print(std::ostream& os,
   for (int i = 0; i < indent; ++i) os << '\t';
   os << "Key Cache Map {" << std::endl;
   for (auto [key, cache] : key_cache_map_) {
-    for (int i = 0; i < indent + 1; ++i) os << '\t';
+    for (int i = 0; i < indent + 2; ++i) os << '\t';
     os << key << ": " << cache << '\n';
   }
   for (int i = 0; i < indent; ++i) os << '\t';

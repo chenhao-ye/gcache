@@ -11,12 +11,11 @@ namespace gcache {
 // should be a lightweight type to copy.
 template <typename Tag_t, typename Key_t, typename Value_t>
 class SharedCache {
+ public:
   struct TaggedValue_t {
     Tag_t tag;
     Value_t value;
   };
-
- public:
   typedef LRUHandle<Key_t, TaggedValue_t> Handle_t;
   SharedCache() : pool_(nullptr), tenant_cache_map_(), key_cache_map_(){};
   ~SharedCache() { delete[] pool_; };
@@ -43,12 +42,23 @@ class SharedCache {
   // return; return number of handles relocated successfully
   size_t relocate(Tag_t src, Tag_t dst, size_t size);
 
+  // handle op wrappers
+  static Tag_t get_tag(Handle_t* e) { return e->value.tag; }
+  static Key_t get_key(Handle_t* e) { return e->value.key; }
+  static Value_t& get_value(Handle_t* e) { return e->value.value; }
+
  private:
   Handle_t* pool_;
   // Map each tenant's tag to its own cache; must be const after `init`
   std::unordered_map<Tag_t, LRUCache<Key_t, TaggedValue_t>*> tenant_cache_map_;
   // Map each key to the cache that holds the key
   std::unordered_map<Key_t, LRUCache<Key_t, TaggedValue_t>*> key_cache_map_;
+
+ public:  // for debugging
+  std::ostream& print(std::ostream& os, int indent = 0) const;
+  friend std::ostream& operator<<(std::ostream& os, const SharedCache& c) {
+    return c.print(os);
+  }
 };
 
 template <typename Tag_t, typename Key_t, typename Value_t>
@@ -56,7 +66,7 @@ void SharedCache<Tag_t, Key_t, Value_t>::init(
     const std::vector<std::pair<Tag_t, size_t>>& tenant_configs) {
   size_t total_capacity = 0;
   size_t begin_idx = 0;
-  for (auto [tag, capacity] : tenant_configs) capacity += capacity;
+  for (auto [tag, capacity] : tenant_configs) total_capacity += capacity;
 
   pool_ = new Handle_t[total_capacity];
   for (auto [tag, capacity] : tenant_configs) {
@@ -119,6 +129,32 @@ size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
     dst_cache->assign(e);
   }
   return n;
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t>
+std::ostream& SharedCache<Tag_t, Key_t, Value_t>::print(std::ostream& os,
+                                                        int indent) const {
+  os << "Tenant Cache Map {" << std::endl;
+  for (auto [tag, cache] : tenant_cache_map_) {
+    for (int i = 0; i < indent; ++i) os << '\t';
+    os << "Tenant (tag=" << tag << ", cache=" << cache << ") {\n";
+    for (int i = 0; i < indent + 1; ++i) os << '\t';
+    cache->print(indent + 1);
+    for (int i = 0; i < indent + 1; ++i) os << '\t';
+    os << "}\n";
+  }
+  for (int i = 0; i < indent; ++i) os << '\t';
+  os << "}\n";
+
+  for (int i = 0; i < indent; ++i) os << '\t';
+  os << "Key Cache Map {" << std::endl;
+  for (auto [key, cache] : key_cache_map_) {
+    for (int i = 0; i < indent + 1; ++i) os << '\t';
+    os << key << ": " << cache << '\n';
+  }
+  for (int i = 0; i < indent; ++i) os << '\t';
+  os << "}\n";
+  return os;
 }
 
 }  // namespace gcache

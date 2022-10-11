@@ -52,7 +52,7 @@ class LRUCache {
 
   // Init a handle pool from the given pool but not owned this pool; the caller
   // must free the pool after dtor
-  void init_from_pool(size_t capacity, Handle_t* pool);
+  void init_from_pool(Handle_t* pool, size_t capacity);
 
   // Force this cache to return a handle (i.e. a cache slot) back to caller;
   // will try to return from free list first; if not available, preempt from
@@ -153,7 +153,7 @@ LRUCache<Key_t, Value_t>::insert(Key_t key, uint32_t hash, bool pin,
   // Search to see if already exists
   Handle_t* e;
 
-  if (!not_exist) { // if not sure whether the key exists, do lookup
+  if (!not_exist) {  // if not sure whether the key exists, do lookup
     e = lookup(key, hash, pin);
     if (e) return e;
   }
@@ -216,7 +216,7 @@ LRUCache<Key_t, Value_t>::touch(Key_t key, uint32_t hash,
 
 template <typename Key_t, typename Value_t>
 inline void LRUCache<Key_t, Value_t>::init_from_pool(
-    size_t capacity, typename LRUCache<Key_t, Value_t>::Handle_t* pool) {
+    typename LRUCache<Key_t, Value_t>::Handle_t* pool, size_t capacity) {
   assert(!capacity_ && !pool_);
   assert(capacity);
   capacity_ = capacity;

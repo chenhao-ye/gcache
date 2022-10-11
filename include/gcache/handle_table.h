@@ -49,7 +49,7 @@ class HandleTable {
 template <typename Key_t, typename Value_t>
 inline void HandleTable<Key_t, Value_t>::insert(Handle_t* e) {
   // Caller must ensure e->key does not present in the table!
-  assert(!lookup(e->key, e->value));
+  assert(!lookup(e->key, e->hash));
   // Add to the head of this linked list
   Handle_t** ptr = &list_[e->hash & (length_ - 1)];
   e->next_hash = *ptr;

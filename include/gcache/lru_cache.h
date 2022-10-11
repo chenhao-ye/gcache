@@ -33,8 +33,10 @@ class LRUCache {
   // LRU; a pinned handle must be unpinned later by calling release()
 
   // Insert a handle into cache with giveb key and hash if not exists; if does,
-  // return the existing one
-  Handle_t* insert(Key_t key, uint32_t hash, bool pin = false);
+  // return the existing one; if it is known for sure that the key must not
+  // exist, set not_exist to true to skip a lookup
+  Handle_t* insert(Key_t key, uint32_t hash, bool pin = false,
+                   bool not_exist = false);
   // Search for a handle; return nullptr if not exist
   Handle_t* lookup(Key_t key, uint32_t hash, bool pin = false);
   // Release pinned handle returned by insert/lookup
@@ -143,18 +145,17 @@ inline void LRUCache<Key_t, Value_t>::init(size_t capacity) {
 
 template <typename Key_t, typename Value_t>
 inline typename LRUCache<Key_t, Value_t>::Handle_t*
-LRUCache<Key_t, Value_t>::insert(Key_t key, uint32_t hash, bool pin) {
+LRUCache<Key_t, Value_t>::insert(Key_t key, uint32_t hash, bool pin,
+                                 bool not_exist) {
   // Disable support for capacity_ == 0; the user must set capacity first
   assert(capacity_ > 0);
 
   // Search to see if already exists
-  Handle_t* e = table_.lookup(key, hash);
-  if (e) {
-    if (pin)
-      ref(e);
-    else if (e->refs == 1)
-      lru_refresh(e);
-    return e;
+  Handle_t* e;
+
+  if (!not_exist) { // if not sure whether the key exists, do lookup
+    e = lookup(key, hash, pin);
+    if (e) return e;
   }
 
   e = alloc_handle();
@@ -175,7 +176,12 @@ template <typename Key_t, typename Value_t>
 inline typename LRUCache<Key_t, Value_t>::Handle_t*
 LRUCache<Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
   Handle_t* e = table_.lookup(key, hash);
-  if (e && pin) ref(e);
+  if (e) {
+    if (pin)
+      ref(e);
+    else if (e->refs == 1)
+      lru_refresh(e);
+  }
   return e;
 }
 

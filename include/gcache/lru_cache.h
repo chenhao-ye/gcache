@@ -47,7 +47,7 @@ class LRUCache {
   Handle_t* touch(Key_t key, uint32_t hash, Handle_t*& successor);
 
   /****************************************************************************/
-  /* Below are intrusive functions that should only called by SharedCache     */
+  /* Below are intrusive functions that should only be called by SharedCache  */
   /****************************************************************************/
 
   // Init handle pool and table from externally instantiated ones but not owned

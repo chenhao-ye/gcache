@@ -29,7 +29,7 @@ class SharedCache {
 
   void init(const std::vector<std::pair<Tag_t, size_t>>& tenant_configs);
 
-  // Insert a handle into cache with giveb key and hash if not exists; if does,
+  // Insert a handle into cache with given key and hash if not exists; if does,
   // return the existing one
   Handle_t* insert(Tag_t tag, Key_t key, uint32_t hash, bool pin = false);
   // Search for a handle; return nullptr if not exist; no tag required because

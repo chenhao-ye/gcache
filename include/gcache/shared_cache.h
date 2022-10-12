@@ -20,7 +20,7 @@ class SharedCache {
     }
   };
   typedef LRUHandle<Key_t, TaggedValue_t> Handle_t;
-  SharedCache() : pool_(nullptr), tenant_cache_map_(), key_cache_map_(){};
+  SharedCache() : pool_(nullptr), table_(), tenant_cache_map_(){};
   ~SharedCache() { delete[] pool_; };
   SharedCache(const SharedCache&) = delete;
   SharedCache(SharedCache&&) = delete;
@@ -55,10 +55,10 @@ class SharedCache {
 
  private:
   Handle_t* pool_;
+  HandleTable<Key_t, TaggedValue_t> table_;
+
   // Map each tenant's tag to its own cache; must be const after `init`
-  std::unordered_map<Tag_t, LRUCache<Key_t, TaggedValue_t>*> tenant_cache_map_;
-  // Map each key to the cache that holds the key
-  std::unordered_map<Key_t, LRUCache<Key_t, TaggedValue_t>*> key_cache_map_;
+  std::unordered_map<Tag_t, LRUCache<Key_t, TaggedValue_t>> tenant_cache_map_;
 
  public:  // for debugging
   std::ostream& print(std::ostream& os, int indent = 0) const;
@@ -74,12 +74,11 @@ void SharedCache<Tag_t, Key_t, Value_t>::init(
   size_t begin_idx = 0;
   for (auto [tag, capacity] : tenant_configs) total_capacity += capacity;
 
+  table_.init(total_capacity);
   pool_ = new Handle_t[total_capacity];
   for (auto [tag, capacity] : tenant_configs) {
-    auto cache = new LRUCache<Key_t, TaggedValue_t>;
-    cache->init_from_pool(&pool_[begin_idx], capacity);
+    tenant_cache_map_[tag].init_from(&pool_[begin_idx], &table_, capacity);
     begin_idx += capacity;
-    tenant_cache_map_.emplace(tag, cache);
   }
   assert(begin_idx == total_capacity);
 }
@@ -88,52 +87,50 @@ template <typename Tag_t, typename Key_t, typename Value_t>
 inline typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t*
 SharedCache<Tag_t, Key_t, Value_t>::insert(Tag_t tag, Key_t key, uint32_t hash,
                                            bool pin) {
+  assert(tenant_cache_map_.contains(tag));
   Handle_t* e = lookup(key, hash, pin);
   if (e) return e;
 
   // The key does not exist in the cache, perform insertion
-  auto it = tenant_cache_map_.find(tag);
-  if (it == tenant_cache_map_.end()) return nullptr;  // Tenant not found!
-  auto cache = it->second;
-  e = cache->insert(key, hash, pin, /*not_exist*/ true);
+  e = tenant_cache_map_[tag].insert(key, hash, pin, /*not_exist*/ true);
   if (!e) return nullptr;
   e->value.tag = tag;
-  key_cache_map_.emplace(key, cache);
   return e;
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
 inline typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t*
 SharedCache<Tag_t, Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
-  auto it = key_cache_map_.find(key);
-  if (it == key_cache_map_.end()) return nullptr;
-  return it->second->lookup(key, hash, pin);
+  Handle_t* e = table_.lookup(key, hash);
+  if (!e) return nullptr;
+
+  Tag_t tag = get_tag(e);
+  assert(tenant_cache_map_.contains(tag));
+  tenant_cache_map_[tag].try_refresh(e, pin);
+  return e;
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
 void SharedCache<Tag_t, Key_t, Value_t>::release(
     typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t* handle) {
   Tag_t tag = handle->value.tag;
-  auto it = tenant_cache_map_.find(tag);
-  assert(it != tenant_cache_map_.end());
-  it->second->release(handle);
+  assert(tenant_cache_map_.contains(tag));
+  tenant_cache_map_[tag].release(handle);
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
 size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
                                                     size_t size) {
-  auto src_it = tenant_cache_map_.find(src);
-  auto dst_it = tenant_cache_map_.find(dst);
-  if (src_it == tenant_cache_map_.end() || dst_it == tenant_cache_map_.end())
-    return 0;
+  assert(tenant_cache_map_.contains(src));
+  assert(tenant_cache_map_.contains(dst));
 
-  auto src_cache = src_it->second;
-  auto dst_cache = dst_it->second;
+  auto& src_cache = tenant_cache_map_[src];
+  auto& dst_cache = tenant_cache_map_[dst];
   size_t n = 0;
   for (; n < size; ++n) {
-    auto e = src_cache->preempt();
+    auto e = src_cache.preempt();
     if (!e) break;
-    dst_cache->assign(e);
+    dst_cache.assign(e);
   }
   return n;
 }
@@ -142,22 +139,13 @@ template <typename Tag_t, typename Key_t, typename Value_t>
 std::ostream& SharedCache<Tag_t, Key_t, Value_t>::print(std::ostream& os,
                                                         int indent) const {
   os << "Tenant Cache Map {" << std::endl;
-  for (auto [tag, cache] : tenant_cache_map_) {
+  for (auto& [tag, cache] : tenant_cache_map_) {
     for (int i = 0; i < indent + 1; ++i) os << '\t';
-    os << "Tenant (tag=" << tag << ", cache=" << cache << ") {\n";
+    os << "Tenant (tag=" << tag << ") {\n";
     for (int i = 0; i < indent + 2; ++i) os << '\t';
-    cache->print(os, indent + 2);
+    cache.print(os, indent + 2);
     for (int i = 0; i < indent + 1; ++i) os << '\t';
     os << "}\n";
-  }
-  for (int i = 0; i < indent; ++i) os << '\t';
-  os << "}\n";
-
-  for (int i = 0; i < indent; ++i) os << '\t';
-  os << "Key Cache Map {" << std::endl;
-  for (auto [key, cache] : key_cache_map_) {
-    for (int i = 0; i < indent + 2; ++i) os << '\t';
-    os << key << ": " << cache << '\n';
   }
   for (int i = 0; i < indent; ++i) os << '\t';
   os << "}\n";

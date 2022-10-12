@@ -25,11 +25,12 @@ class HandleTable {
   HandleTable() : length_(0), list_(nullptr) {}
   ~HandleTable() { delete[] list_; }
 
+  void init(size_t size);  // size must be 2^n; must be called before any r/w
+
   // Caller must ensure e's key does not already present in table!
   void insert(Handle_t* e);
   Handle_t* lookup(Key_t key, uint32_t hash);
   Handle_t* remove(Key_t key, uint32_t hash);
-  void reserve(size_t size);  // size must be 2^n; must be called before any r/w
 
  private:
   // Return a pointer to slot that points to a cache entry that
@@ -87,7 +88,7 @@ HandleTable<Key_t, Value_t>::find_pointer(Key_t key, uint32_t hash) {
 }
 
 template <typename Key_t, typename Value_t>
-inline void HandleTable<Key_t, Value_t>::reserve(size_t size) {
+inline void HandleTable<Key_t, Value_t>::init(size_t size) {
   size = std::bit_ceil<size_t>(size);
   length_ = size;
   list_ = new Handle_t*[length_];

@@ -17,7 +17,6 @@ void test1() {
   auto h = shared_cache.insert(537, 1, 1001, true);
   assert(h);
   shared_cache.get_value(h) = 111;
-  std::cout << shared_cache << std::endl;
   shared_cache.release(h);
   h = shared_cache.insert(564, 2, 1002, false);
   assert(h);

@@ -28,11 +28,13 @@ class LRUCache {
   LRUCache& operator=(const LRUCache&) = delete;
   LRUCache& operator=(LRUCache&&) = delete;
   void init(size_t capacity);
+  template <typename Fn>
+  void init(size_t capacity, Fn fn);
 
   // Set pin to be true to pin the returned Handle so it won't be recycled by
   // LRU; a pinned handle must be unpinned later by calling release()
 
-  // Insert a handle into cache with giveb key and hash if not exists; if does,
+  // Insert a handle into cache with given key and hash if not exists; if does,
   // return the existing one; if it is known for sure that the key must not
   // exist, set not_exist to true to skip a lookup
   Handle_t* insert(Key_t key, uint32_t hash, bool pin = false,
@@ -41,6 +43,8 @@ class LRUCache {
   Handle_t* lookup(Key_t key, uint32_t hash, bool pin = false);
   // Release pinned handle returned by insert/lookup
   void release(Handle_t* handle);
+  // Pin a handle returned by insert/lookup
+  void pin(Handle_t* handle);
   // Similar to insert but 1) never pin and the targeted handle must be in LRU
   // list, 2) return `successor`: the handle with the same order as the returned
   // handle after LRU operations (nullptr if newly inserted).
@@ -158,6 +162,13 @@ inline void LRUCache<Key_t, Value_t>::init(size_t capacity) {
 }
 
 template <typename Key_t, typename Value_t>
+template <typename Fn>
+inline void LRUCache<Key_t, Value_t>::init(size_t capacity, Fn fn) {
+  init(capacity);
+  for (size_t i = 0; i < capacity; ++i) fn(&pool_[i]);
+}
+
+template <typename Key_t, typename Value_t>
 inline void LRUCache<Key_t, Value_t>::init_from(
     typename LRUCache<Key_t, Value_t>::Handle_t* pool,
     HandleTable<Key_t, Value_t>* table, size_t capacity) {
@@ -216,6 +227,11 @@ LRUCache<Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
 template <typename Key_t, typename Value_t>
 inline void LRUCache<Key_t, Value_t>::release(Handle_t* handle) {
   unref(handle);
+}
+
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::pin(Handle_t* handle) {
+  ref(handle);
 }
 
 template <typename Key_t, typename Value_t>

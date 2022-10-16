@@ -29,7 +29,11 @@ class LRUCache {
   LRUCache& operator=(LRUCache&&) = delete;
   void init(size_t capacity);
   template <typename Fn>
-  void init(size_t capacity, Fn fn);
+  void init(size_t capacity, Fn&& fn);
+
+  // For each item in the cache, call fn(key, handle)
+  template <typename Fn>
+  void for_each(Fn&& fn);
 
   // Set pin to be true to pin the returned Handle so it won't be recycled by
   // LRU; a pinned handle must be unpinned later by calling release()
@@ -43,6 +47,8 @@ class LRUCache {
   Handle_t* lookup(Key_t key, uint32_t hash, bool pin = false);
   // Release pinned handle returned by insert/lookup
   void release(Handle_t* handle);
+  // Evict a handle from cache, w/o adding it to the free list
+  void evict(Handle_t* handle);
   // Pin a handle returned by insert/lookup
   void pin(Handle_t* handle);
   // Similar to insert but 1) never pin and the targeted handle must be in LRU
@@ -163,9 +169,18 @@ inline void LRUCache<Key_t, Value_t>::init(size_t capacity) {
 
 template <typename Key_t, typename Value_t>
 template <typename Fn>
-inline void LRUCache<Key_t, Value_t>::init(size_t capacity, Fn fn) {
+inline void LRUCache<Key_t, Value_t>::init(size_t capacity, Fn&& fn) {
   init(capacity);
-  for (size_t i = 0; i < capacity; ++i) fn(&pool_[i]);
+  for (size_t i = 0; i < capacity; ++i) {
+    fn(&pool_[i]);
+  }
+}
+
+template <typename Key_t, typename Value_t>
+template <typename Fn>
+inline void LRUCache<Key_t, Value_t>::for_each(Fn&& fn) {
+  in_use_.for_each(fn);
+  lru_.for_each(fn);
 }
 
 template <typename Key_t, typename Value_t>
@@ -232,6 +247,12 @@ inline void LRUCache<Key_t, Value_t>::release(Handle_t* handle) {
 template <typename Key_t, typename Value_t>
 inline void LRUCache<Key_t, Value_t>::pin(Handle_t* handle) {
   ref(handle);
+}
+
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::evict(Handle_t* handle) {
+  handle->refs = 0;
+  list_remove(handle);
 }
 
 template <typename Key_t, typename Value_t>

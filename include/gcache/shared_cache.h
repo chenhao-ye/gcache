@@ -1,3 +1,4 @@
+#pragma once
 #include <cstddef>
 #include <unordered_map>
 #include <vector>
@@ -28,6 +29,13 @@ class SharedCache {
   SharedCache& operator=(SharedCache&&) = delete;
 
   void init(const std::vector<std::pair<Tag_t, size_t>>& tenant_configs);
+  template <typename Fn>
+  void init(const std::vector<std::pair<Tag_t, size_t>>& tenant_configs,
+            Fn&& fn);
+
+  // For each item in the cache, call fn(key, handle)
+  template <typename Fn>
+  void for_each(Fn&& fn);
 
   // Insert a handle into cache with given key and hash if not exists; if does,
   // return the existing one
@@ -40,6 +48,10 @@ class SharedCache {
   Handle_t* lookup(Key_t key, uint32_t hash, bool pin = false);
   // Release pinned handle returned by insert/lookup
   void release(Handle_t* handle);
+  // Pin a handle returned by insert/lookup
+  void pin(Handle_t* handle);
+  // Evict a handle from cache, w/o adding it to the free list
+  void evict(Handle_t* handle);
   // `touch` is not implemented yet because it is mostly used on GhostCache and
   // it is unclear whether it is useful in the real cache
 
@@ -55,6 +67,7 @@ class SharedCache {
 
  private:
   Handle_t* pool_;
+  size_t total_capacity_;
   HandleTable<Key_t, TaggedValue_t> table_;
 
   // Map each tenant's tag to its own cache; must be const after `init`
@@ -70,17 +83,35 @@ class SharedCache {
 template <typename Tag_t, typename Key_t, typename Value_t>
 void SharedCache<Tag_t, Key_t, Value_t>::init(
     const std::vector<std::pair<Tag_t, size_t>>& tenant_configs) {
-  size_t total_capacity = 0;
+  total_capacity_ = 0;
   size_t begin_idx = 0;
-  for (auto [tag, capacity] : tenant_configs) total_capacity += capacity;
+  for (auto [tag, capacity] : tenant_configs) total_capacity_ += capacity;
 
-  table_.init(total_capacity);
-  pool_ = new Handle_t[total_capacity];
+  table_.init(total_capacity_);
+  pool_ = new Handle_t[total_capacity_];
   for (auto [tag, capacity] : tenant_configs) {
     tenant_cache_map_[tag].init_from(&pool_[begin_idx], &table_, capacity);
     begin_idx += capacity;
   }
-  assert(begin_idx == total_capacity);
+  assert(begin_idx == total_capacity_);
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t>
+template <typename Fn>
+void SharedCache<Tag_t, Key_t, Value_t>::init(
+    const std::vector<std::pair<Tag_t, size_t>>& tenant_configs, Fn&& fn) {
+  init(tenant_configs);
+  for (size_t i = 0; i < total_capacity_; ++i) {
+    fn(&pool_[i]);
+  }
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t>
+template <typename Fn>
+inline void SharedCache<Tag_t, Key_t, Value_t>::for_each(Fn&& fn) {
+  for (auto& [tag, cache] : tenant_cache_map_) {
+    cache.for_each(fn);
+  }
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
@@ -116,6 +147,22 @@ void SharedCache<Tag_t, Key_t, Value_t>::release(
   Tag_t tag = handle->value.tag;
   assert(tenant_cache_map_.contains(tag));
   tenant_cache_map_[tag].release(handle);
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t>
+void SharedCache<Tag_t, Key_t, Value_t>::pin(
+    typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t* handle) {
+  Tag_t tag = handle->value.tag;
+  assert(tenant_cache_map_.contains(tag));
+  tenant_cache_map_[tag].pin(handle);
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t>
+void SharedCache<Tag_t, Key_t, Value_t>::evict(
+    typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t* handle) {
+  Tag_t tag = handle->value.tag;
+  assert(tenant_cache_map_.contains(tag));
+  tenant_cache_map_[tag].evict(handle);
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>

@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
+#include <tuple>
 
 namespace gcache {
 // LRU cache implementation
@@ -33,17 +34,9 @@ template <typename Key_t, typename Value_t, typename Tag_t>
 class LRUCache;
 class GhostCache;
 
-template <typename Tag_t>
-struct TagWrapper {
-  Tag_t tag;
-};
-
-template <>
-struct TagWrapper<nullptr_t> {};
-
 // LRUNodes forms a circular doubly linked list ordered by access time.
-template <typename Key_t, typename Value_t, typename Tag_t = nullptr_t>
-class LRUNode : public TagWrapper<Tag_t> {
+template <typename Key_t, typename Value_t, typename Tag_t = std::tuple<>>
+class LRUNode {
   LRUNode *next_hash;
   LRUNode *next;
   LRUNode *prev;
@@ -54,6 +47,9 @@ class LRUNode : public TagWrapper<Tag_t> {
   friend class GhostCache;
 
  public:
+  // User-defined tag, [[no_unique_address]] is used so that the field does not
+  // affect the size if it is empty (e.g., std::tuple<>)
+  [[no_unique_address]] Tag_t tag;
   uint32_t hash;  // Hash of key; used for fast sharding and comparisons
   Key_t key;
   Value_t value;

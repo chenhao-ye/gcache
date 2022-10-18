@@ -64,6 +64,8 @@ class LRUNode {
     this->key = k;
   }
 
+  uint32_t get_refs() const { return refs; }
+
   // print for debugging
   friend std::ostream &operator<<(std::ostream &os, const LRUNode &h) {
     if constexpr (std::is_same_v<Tag_t, nullptr_t>) {

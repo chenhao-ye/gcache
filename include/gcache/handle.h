@@ -49,7 +49,7 @@ class LRUNode {
 
  public:
   // User-defined tag, [[no_unique_address]] is used so that the field does not
-  // affect the size if it is EmptyTag. 
+  // affect the size if it is EmptyTag.
   [[no_unique_address]] Tag_t tag;
   uint32_t hash;  // Hash of key; used for fast sharding and comparisons
   Key_t key;
@@ -80,7 +80,7 @@ class LRUNode {
   template <typename Fn>
   void for_each(Fn fn) {
     fn(this->key, this);
-    for (LRUNode *h = next; h != this; h = h->next) {
+    for (LRUNode *h = next; h->next != h && h != this; h = h->next) {
       fn(h->key, h);
     }
   }

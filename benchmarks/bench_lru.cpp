@@ -13,21 +13,21 @@ void test() {
 
   auto h1 = cache.insert(1, 1001, true);
   assert(h1);
-  h1->value = 111;
+  *h1 = 111;
   auto h2 = cache.insert(2, 1002, true);
   assert(h2);
-  h2->value = 222;
+  *h1 = 222;
   auto h3 = cache.insert(3, 1003, true);
   assert(h3);
-  h3->value = 333;
+  *h1 = 333;
   auto h4 = cache.insert(4, 1004);
   assert(h4);
-  h4->value = 444;
+  *h1 = 444;
   std::cout << "=== Expect: lru: [4], in_use: [1, 2, 3] ===\n";
   std::cout << cache;
 
   h4 = cache.lookup(4, 1004, true);
-  h4->value = 4444;
+  *h4 = 4444;
   std::cout << "=== Expect: lru: [], in_use: [1, 2, 3, 4] ===\n";
   std::cout << cache;
 
@@ -38,7 +38,7 @@ void test() {
   cache.release(h3);
   h5 = cache.insert(5, 1005, true);
   assert(h5);
-  h5->value = 555;
+  *h5 = 555;
   std::cout << "\n=== Expect: in_use: [1, 2, 4, 5] ===\n";
   std::cout << cache;
 
@@ -50,7 +50,7 @@ void test() {
 
   h3 = cache.insert(3, 1003, true);
   assert(h3);
-  h3->value = 3333;
+  *h3 = 3333;
   h5 = cache.lookup(5, 1005, true);
   std::cout << "\n=== Expect: lru: [2, 4], in_use: [1, 3] ===\n";
   std::cout << cache;
@@ -63,13 +63,13 @@ void test() {
 
   auto h6 = cache.insert(6, 1006, true);
   assert(h6);
-  h6->value = 666;
+  *h6 = 666;
   std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
   std::cout << cache;
 
   auto h5_ = cache.insert(5, 1005, true);
   assert(h5_ == h5);
-  h5_->value = 5555;
+  *h5_ = 5555;
   std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
   std::cout << cache;
 
@@ -94,7 +94,7 @@ void test() {
 
   h7 = cache.insert(7, 1007);
   assert(h7);
-  h7->value = 777;
+  *h7 = 777;
   std::cout << "\n=== Expect: lru: [3, 6, 5, 7], in_use: [] ===\n";
   std::cout << cache;
   std::cout << std::flush;

@@ -27,45 +27,64 @@ namespace gcache {
 // when they detect an element in the cache acquiring or losing its only
 // external reference.
 
-template <typename Key_t, typename Value_t>
+template <typename Node_t>
 class HandleTable;
-template <typename Key_t, typename Value_t>
+template <typename Key_t, typename Value_t, typename Tag_t>
 class LRUCache;
 class GhostCache;
 
-// An entry is a variable length heap-allocated structure.  Entries
-// are kept in a circular doubly linked list ordered by access time.
-template <typename Key_t, typename Value_t>
-class LRUHandle {
- private:
-  LRUHandle* next_hash;
-  LRUHandle* next;
-  LRUHandle* prev;
+struct EmptyTag {};
+
+// LRUNodes forms a circular doubly linked list ordered by access time.
+template <typename Key_t, typename Value_t, typename Tag_t = EmptyTag>
+class LRUNode {
+  LRUNode *next_hash;
+  LRUNode *next;
+  LRUNode *prev;
   uint32_t refs;  // References, including cache reference, if present.
 
-  friend class HandleTable<Key_t, Value_t>;
-  friend class LRUCache<Key_t, Value_t>;
+  friend class HandleTable<LRUNode>;
+  friend class LRUCache<Key_t, Value_t, Tag_t>;
   friend class GhostCache;
 
  public:
+  // User-defined tag, [[no_unique_address]] is used so that the field does not
+  // affect the size if it is EmptyTag. 
+  [[no_unique_address]] Tag_t tag;
   uint32_t hash;  // Hash of key; used for fast sharding and comparisons
   Key_t key;
   Value_t value;
 
-  void init(Key_t key, uint32_t hash) {
+  using key_type = Key_t;
+  using value_type = Value_t;
+
+  void init(Key_t k, uint32_t h) {
     this->refs = 1;
-    this->hash = hash;
-    this->key = key;
+    this->hash = h;
+    this->key = k;
   }
 
   // print for debugging
-  friend std::ostream& operator<<(std::ostream& os, const LRUHandle& h) {
-    return os << h.key << ": " << h.value << " (refs=" << h.refs
-              << ", hash=" << h.hash << ")";
+  friend std::ostream &operator<<(std::ostream &os, const LRUNode &h) {
+    if constexpr (std::is_same_v<Tag_t, nullptr_t>) {
+      return os << h.key << ": " << h.value << " (refs=" << h.refs
+                << ", hash=" << h.hash << ")";
+    } else {
+      return os << h.key << ": " << h.value << " (refs=" << h.refs
+                << ", hash=" << h.hash << ", tag=" << h.tag << ")";
+    }
   }
 
-  // print a list; this must be a dummpy list head
-  std::ostream& print_list(std::ostream& os) const {
+  template <typename Fn>
+  void for_each(Fn fn) {
+    fn(this->key, this);
+    for (LRUNode *h = next; h != this; h = h->next) {
+      fn(h->key, h);
+    }
+  }
+
+  // print a list; this must be a dummy list head
+  std::ostream &print_list(std::ostream &os) const {
     auto h = next;
     if (h == this) return os;
     os << h->key;
@@ -79,7 +98,7 @@ class LRUHandle {
     return os;
   }
 
-  std::ostream& print_list_hash(std::ostream& os) const {
+  std::ostream &print_list_hash(std::ostream &os) const {
     auto h = this;
     while (h) {
       os << '\t' << *h << ';';
@@ -89,4 +108,48 @@ class LRUHandle {
     return os;
   }
 };
+
+// make sure that Tag_t does not occupy space if it is not provided
+static_assert(sizeof(LRUNode<int, int>) == 40);
+static_assert(sizeof(LRUNode<int, int, int>) == 48);
+
+// LRUHandle is essentially just LRUNode*.
+// Use LRUHandle for public APIs as it's easier to access the value.
+// Use LRUNode* for internal APIs as it's easier to access internal fields.
+template <typename Node_t>
+struct LRUHandle {
+  LRUHandle() = default;
+  LRUHandle(const LRUHandle &) = default;
+  LRUHandle(LRUHandle &&) noexcept = default;
+  LRUHandle &operator=(const LRUHandle &) = default;
+  LRUHandle &operator=(LRUHandle &&) noexcept = default;
+
+  LRUHandle(Node_t *node) : node(node) {}
+
+  // overload -> and *
+  Node_t::value_type *operator->() { return &node->value; }
+  const Node_t::value_type *operator->() const { return &node->value; }
+  Node_t::value_type &operator*() { return node->value; }
+
+  // overload bool
+  explicit operator bool() const { return node != nullptr; }
+
+  // overload == and !=
+  bool operator==(std::nullptr_t) const { return node == nullptr; }
+  bool operator!=(std::nullptr_t) const { return node != nullptr; }
+  bool operator==(const LRUHandle &other) const { return node == other.node; }
+  bool operator!=(const LRUHandle &other) const { return node != other.node; }
+
+  Node_t *node = nullptr;
+};
+static_assert(sizeof(LRUHandle<LRUNode<int, int>>) == 8);
 }  // namespace gcache
+
+namespace std {
+template <typename Node_t>
+struct hash<gcache::LRUHandle<Node_t>> {
+  std::size_t operator()(const gcache::LRUHandle<Node_t> &h) const {
+    return std::hash<void *>()(h.node);
+  }
+};
+}  // namespace std

@@ -111,9 +111,10 @@ class GhostCache {
   // is ((size_idx + 1) * tick) but not if the cache size is (size_idx * tick).
   LRUCache<uint32_t, uint32_t> cache;
 
-  typedef LRUCache<uint32_t, uint32_t>::Handle_t Handle_t;
+  using Handle_t = LRUCache<uint32_t, uint32_t>::Handle_t;
+  using Node_t = LRUCache<uint32_t, uint32_t>::Node_t;
   // these must be placed after num_ticks to ensure a correct ctor order
-  std::vector<Handle_t*> size_boundaries;
+  std::vector<Node_t*> size_boundaries;
   std::vector<CacheStat> caches_stat;
 
   void access_impl(uint32_t page_id, uint32_t hash);
@@ -209,8 +210,8 @@ class SampleGhostCache : public GhostCache {
  */
 inline void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
   uint32_t size_idx;
-  Handle_t* s;  // successor
-  Handle_t* h = cache.touch(page_id, hash, s);
+  Handle_t s;  // successor
+  Handle_t h = cache.touch(page_id, hash, s);
   assert(h);  // Since there is no handle in use, allocation must never fail.
 
   /**
@@ -230,9 +231,9 @@ inline void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
    *  2) if B itself is a boundary, set that boundary to B's sucessor.
    */
   if (s) {  // No new insertion
-    size_idx = h->value;
+    size_idx = *h;
     if (size_idx < num_ticks && size_boundaries[size_idx] == h)
-      size_boundaries[size_idx] = s;
+      size_boundaries[size_idx] = s.node;
   } else {
     assert(lru_size <= max_size);
     if (lru_size < max_size) ++lru_size;
@@ -256,7 +257,7 @@ inline void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
     for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_miss();
   }
 
-  h->value = 0;
+  *h = 0;
 }
 
 inline std::ostream& GhostCache::print(std::ostream& os, int indent) const {

@@ -45,8 +45,6 @@ class SharedCache {
   void release(Handle_t handle);
   // Pin a handle returned by insert/lookup
   void pin(Handle_t handle);
-  // Evict a handle from cache, w/o adding it to the free list
-  void evict(Handle_t handle);
   // `touch` is not implemented yet because it is mostly used on GhostCache and
   // it is unclear whether it is useful in the real cache
 
@@ -145,14 +143,6 @@ void SharedCache<Tag_t, Key_t, Value_t>::pin(
   Tag_t tag = handle.node->tag;
   assert(tenant_cache_map_.contains(tag));
   tenant_cache_map_[tag].pin(handle);
-}
-
-template <typename Tag_t, typename Key_t, typename Value_t>
-void SharedCache<Tag_t, Key_t, Value_t>::evict(
-    typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t handle) {
-  Tag_t tag = handle.node->tag;
-  assert(tenant_cache_map_.contains(tag));
-  tenant_cache_map_[tag].evict(handle);
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>

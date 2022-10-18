@@ -48,8 +48,6 @@ class LRUCache {
   Handle_t lookup(Key_t key, uint32_t hash, bool pin = false);
   // Release pinned handle returned by insert/lookup
   void release(Handle_t handle);
-  // Evict a handle from cache, w/o adding it to the free list
-  void evict(Handle_t handle);
   // Pin a handle returned by insert/lookup
   void pin(Handle_t handle);
   // Similar to insert but 1) never pin and the targeted handle must be in LRU
@@ -246,13 +244,6 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::release(Handle_t handle) {
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline void LRUCache<Key_t, Value_t, Tag_t>::pin(Handle_t handle) {
   ref(handle.node);
-}
-
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::evict(Handle_t handle) {
-  Node_t* e = handle.node;
-  e->refs = 0;
-  list_remove(e);
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>

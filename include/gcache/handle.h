@@ -49,7 +49,7 @@ class LRUNode {
 
  public:
   // User-defined tag, [[no_unique_address]] is used so that the field does not
-  // affect the size if it is EmptyTag. 
+  // affect the size if it is EmptyTag.
   [[no_unique_address]] Tag_t tag;
   uint32_t hash;  // Hash of key; used for fast sharding and comparisons
   Key_t key;
@@ -77,10 +77,8 @@ class LRUNode {
 
   template <typename Fn>
   void for_each(Fn fn) {
-    fn(this->key, this);
-    for (LRUNode *h = next; h != this; h = h->next) {
+    for (auto h = next; h != this; h = h->next)
       fn(h->key, h);
-    }
   }
 
   // print a list; this must be a dummy list head
@@ -107,6 +105,9 @@ class LRUNode {
     os << '\n';
     return os;
   }
+
+  template <typename Node_t>
+  friend struct LRUHandle;
 };
 
 // make sure that Tag_t does not occupy space if it is not provided
@@ -125,6 +126,8 @@ struct LRUHandle {
   LRUHandle &operator=(LRUHandle &&) noexcept = default;
 
   LRUHandle(Node_t *node) : node(node) {}
+
+  uint32_t get_refs() const { return node->refs; }
 
   // overload -> and *
   Node_t::value_type *operator->() { return &node->value; }

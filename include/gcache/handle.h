@@ -64,8 +64,6 @@ class LRUNode {
     this->key = k;
   }
 
-  uint32_t get_refs() const { return refs; }
-
   // print for debugging
   friend std::ostream &operator<<(std::ostream &os, const LRUNode &h) {
     if constexpr (std::is_same_v<Tag_t, nullptr_t>) {
@@ -107,6 +105,9 @@ class LRUNode {
     os << '\n';
     return os;
   }
+
+  template <typename Node_t>
+  friend struct LRUHandle;
 };
 
 // make sure that Tag_t does not occupy space if it is not provided
@@ -125,6 +126,8 @@ struct LRUHandle {
   LRUHandle &operator=(LRUHandle &&) noexcept = default;
 
   LRUHandle(Node_t *node) : node(node) {}
+
+  uint32_t get_refs() const { return node->refs; }
 
   // overload -> and *
   Node_t::value_type *operator->() { return &node->value; }

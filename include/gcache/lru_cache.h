@@ -17,7 +17,7 @@ class GhostCache;
 
 // Key_t should be lightweight that can be pass-by-value
 // Value_t should be trivially copyable
-template <typename Key_t, typename Value_t, typename Tag_t = nullptr_t>
+template <typename Key_t, typename Value_t, typename Tag_t = EmptyTag>
 class LRUCache {
  public:
   using Node_t = LRUNode<Key_t, Value_t, Tag_t>;
@@ -296,7 +296,7 @@ void LRUCache<Key_t, Value_t, Tag_t>::try_refresh(Handle_t handle, bool pin) {
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-inline LRUCache<Key_t, Value_t, Tag_t>::Node_t*
+inline typename LRUCache<Key_t, Value_t, Tag_t>::Node_t*
 LRUCache<Key_t, Value_t, Tag_t>::alloc_handle() {
   if (free_.next != &free_) {  // Allocate from free list
     Node_t* e = free_.next;
@@ -358,7 +358,7 @@ void LRUCache<Key_t, Value_t, Tag_t>::list_append(Node_t* list, Node_t* e) {
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-LRUCache<Key_t, Value_t, Tag_t>::Node_t*
+typename LRUCache<Key_t, Value_t, Tag_t>::Node_t*
 LRUCache<Key_t, Value_t, Tag_t>::lru_refresh(Node_t* e) {
   assert(e != &lru_);
   assert(e->refs == 1);

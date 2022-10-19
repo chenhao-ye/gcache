@@ -66,7 +66,7 @@ class LRUNode {
 
   // print for debugging
   friend std::ostream &operator<<(std::ostream &os, const LRUNode &h) {
-    if constexpr (std::is_same_v<Tag_t, nullptr_t>) {
+    if constexpr (std::is_same_v<Tag_t, EmptyTag>) {
       return os << h.key << ": " << h.value << " (refs=" << h.refs
                 << ", hash=" << h.hash << ")";
     } else {
@@ -77,8 +77,7 @@ class LRUNode {
 
   template <typename Fn>
   void for_each(Fn fn) {
-    for (auto h = next; h != this; h = h->next)
-      fn(h->key, h);
+    for (auto h = next; h != this; h = h->next) fn(h->key, h);
   }
 
   // print a list; this must be a dummy list head
@@ -130,9 +129,9 @@ struct LRUHandle {
   uint32_t get_refs() const { return node->refs; }
 
   // overload -> and *
-  Node_t::value_type *operator->() { return &node->value; }
-  const Node_t::value_type *operator->() const { return &node->value; }
-  Node_t::value_type &operator*() { return node->value; }
+  typename Node_t::value_type *operator->() { return &node->value; }
+  const typename Node_t::value_type *operator->() const { return &node->value; }
+  typename Node_t::value_type &operator*() { return node->value; }
 
   // overload bool
   explicit operator bool() const { return node != nullptr; }
@@ -142,6 +141,11 @@ struct LRUHandle {
   bool operator!=(std::nullptr_t) const { return node != nullptr; }
   bool operator==(const LRUHandle &other) const { return node == other.node; }
   bool operator!=(const LRUHandle &other) const { return node != other.node; }
+  // explictly isallow comparison with raw Node_t pointer; users should not have
+  // access to Node_t anyway; if other friend class needs to compare Handle with
+  // Node_t pointer, must get node out explicitly
+  bool operator==(const Node_t *&other) = delete;
+  bool operator!=(const Node_t *&other) = delete;
 
   Node_t *node = nullptr;
 };

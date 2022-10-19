@@ -20,7 +20,7 @@ namespace gcache {
 // 4.4.3's builtin hashtable.
 template <typename Node_t>
 class HandleTable {
-  using Key_t = Node_t::key_type;
+  using Key_t = typename Node_t::key_type;
 
  public:
   HandleTable() : length_(0), list_(nullptr) {}

@@ -23,7 +23,7 @@ namespace gcache {
 
 // From XXHash:
 // https://github.com/Cyan4973/xxHash/blob/release/xxhash.h#L1968
-static inline uint32_t xxhash_u32(uint32_t x) {
+[[maybe_unused]] static inline uint32_t xxhash_u32(uint32_t x) {
   x ^= x >> 15;
   x *= 0x85EBCA77U;
   x ^= x >> 13;
@@ -34,7 +34,7 @@ static inline uint32_t xxhash_u32(uint32_t x) {
 
 // From MurmurHash:
 // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp#L68
-static inline uint32_t murmurhash_u32(uint32_t x) {
+[[maybe_unused]] static inline uint32_t murmurhash_u32(uint32_t x) {
   x ^= x >> 16;
   x *= 0x85ebca6b;
   x ^= x >> 13;
@@ -232,7 +232,7 @@ inline void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
    */
   if (s) {  // No new insertion
     size_idx = *h;
-    if (size_idx < num_ticks && size_boundaries[size_idx] == h)
+    if (size_idx < num_ticks && size_boundaries[size_idx] == h.node)
       size_boundaries[size_idx] = s.node;
   } else {
     assert(lru_size <= max_size);

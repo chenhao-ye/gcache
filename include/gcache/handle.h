@@ -79,10 +79,8 @@ class LRUNode {
 
   template <typename Fn>
   void for_each(Fn fn) {
-    fn(this->key, this);
-    for (LRUNode *h = next; h->next != h && h != this; h = h->next) {
+    for (auto h = next; h != this; h = h->next)
       fn(h->key, h);
-    }
   }
 
   // print a list; this must be a dummy list head

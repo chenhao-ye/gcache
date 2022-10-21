@@ -141,9 +141,9 @@ struct LRUHandle {
   bool operator!=(std::nullptr_t) const { return node != nullptr; }
   bool operator==(const LRUHandle &other) const { return node == other.node; }
   bool operator!=(const LRUHandle &other) const { return node != other.node; }
-  // explictly isallow comparison with raw Node_t pointer; users should not have
-  // access to Node_t anyway; if other friend class needs to compare Handle with
-  // Node_t pointer, must get node out explicitly
+  // explicitly disallow comparison with raw Node_t pointer; users should not
+  // have access to Node_t anyway; if other friend class needs to compare Handle
+  // with Node_t pointer, must get node out explicitly
   bool operator==(const Node_t *&other) = delete;
   bool operator!=(const Node_t *&other) = delete;
 

@@ -54,6 +54,8 @@ struct CacheStat {
 
  public:
   CacheStat() : hit_cnt(0), miss_cnt(0) {}
+  CacheStat(uint64_t hit_cnt, uint64_t miss_cnt)
+      : hit_cnt(hit_cnt), miss_cnt(miss_cnt) {}
   void add_hit() { ++hit_cnt; }
   void add_miss() { ++miss_cnt; }
 
@@ -69,6 +71,15 @@ struct CacheStat {
   void reset() {
     hit_cnt = 0;
     miss_cnt = 0;
+  }
+
+  CacheStat operator+(const CacheStat& other) {
+    return CacheStat(hit_cnt + other.hit_cnt, miss_cnt + other.miss_cnt);
+  }
+  CacheStat operator-(const CacheStat& other) {
+    assert(hit_cnt >= other.hit_cnt);
+    assert(miss_cnt >= other.miss_cnt);
+    return CacheStat(hit_cnt - other.hit_cnt, miss_cnt - other.miss_cnt);
   }
 
   std::ostream& print(std::ostream& os, int width = 0) const {

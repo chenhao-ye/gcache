@@ -128,7 +128,7 @@ struct LRUHandle {
 
   uint32_t get_refs() const { return node->refs; }
 
-  // overload -> and *
+  // overload -> and * to use LRUHandle like Value_t*
   typename Node_t::value_type *operator->() { return &node->value; }
   const typename Node_t::value_type *operator->() const { return &node->value; }
   typename Node_t::value_type &operator*() { return node->value; }

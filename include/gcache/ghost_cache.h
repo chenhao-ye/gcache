@@ -63,7 +63,7 @@ struct CacheStat {
   // we don't use atomic here because we find it is too expensive.
   double get_hit_rate() const {
     uint64_t acc_cnt = hit_cnt + miss_cnt;
-    if (acc_cnt) return std::numeric_limits<double>::infinity();
+    if (acc_cnt == 0) return std::numeric_limits<double>::infinity();
     return double(hit_cnt) / double(acc_cnt);
   }
   void reset() {

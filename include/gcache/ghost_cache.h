@@ -48,38 +48,31 @@ namespace gcache {
 
 #define gcache_hash(x) crc_u32(x)
 
-class CacheStat {
-  uint64_t acc_cnt;
+struct CacheStat {
   uint64_t hit_cnt;
+  uint64_t miss_cnt;
 
  public:
-  CacheStat() : acc_cnt(0), hit_cnt(0) {}
-  void add_hit() {
-    acc_cnt++;
-    hit_cnt++;
-  }
-  void add_miss() { acc_cnt++; }
+  CacheStat() : hit_cnt(0), miss_cnt(0) {}
+  void add_hit() { ++hit_cnt; }
+  void add_miss() { ++miss_cnt; }
 
   // we may read an inconsistent version if the reader thread is not the writer,
   // but most inaccuracy is tolerable, unless it produces a unreasonable value,
   // e.g., hit_rate > 100%.
   // we don't use atomic here because we find it is too expensive.
   double get_hit_rate() const {
-    uint64_t h, a;
-  retry:
-    h = hit_cnt;
-    a = acc_cnt;
-    // this means we read a problematic inconsistent version
-    if (h > a) goto retry;
-    if (a == 0) return std::numeric_limits<double>::infinity();
+    uint64_t acc_cnt = hit_cnt + miss_cnt;
+    if (acc_cnt) return std::numeric_limits<double>::infinity();
     return double(hit_cnt) / double(acc_cnt);
   }
   void reset() {
-    acc_cnt = 0;
     hit_cnt = 0;
+    miss_cnt = 0;
   }
 
   std::ostream& print(std::ostream& os, int width = 0) const {
+    uint64_t acc_cnt = hit_cnt + miss_cnt;
     if (acc_cnt == 0)
       return os << "    NAN (" << std::setw(width) << std::fixed << hit_cnt
                 << '/' << std::setw(width) << std::fixed << acc_cnt << ')';

@@ -271,7 +271,7 @@ LRUCache<Key_t, Value_t, Tag_t>::touch(Key_t key, uint32_t hash,
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
+inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
 LRUCache<Key_t, Value_t, Tag_t>::preempt() {
   // In fact, it is just like allocate a handle but instead of using it
   // immediately, return it out to caller (i.e. SharedCache)
@@ -281,12 +281,13 @@ LRUCache<Key_t, Value_t, Tag_t>::preempt() {
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-void LRUCache<Key_t, Value_t, Tag_t>::assign(Handle_t e) {
+inline void LRUCache<Key_t, Value_t, Tag_t>::assign(Handle_t e) {
   free_handle(e.node);
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-void LRUCache<Key_t, Value_t, Tag_t>::try_refresh(Handle_t handle, bool pin) {
+inline void LRUCache<Key_t, Value_t, Tag_t>::try_refresh(Handle_t handle,
+                                                         bool pin) {
   Node_t* e = handle.node;
   assert(e);
   if (pin)
@@ -343,13 +344,14 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::unref(Node_t* e) {
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-void LRUCache<Key_t, Value_t, Tag_t>::list_remove(Node_t* e) {
+inline void LRUCache<Key_t, Value_t, Tag_t>::list_remove(Node_t* e) {
   e->next->prev = e->prev;
   e->prev->next = e->next;
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-void LRUCache<Key_t, Value_t, Tag_t>::list_append(Node_t* list, Node_t* e) {
+inline void LRUCache<Key_t, Value_t, Tag_t>::list_append(Node_t* list,
+                                                         Node_t* e) {
   // Make "e" newest entry by inserting just before *list
   e->next = list;
   e->prev = list->prev;
@@ -358,7 +360,7 @@ void LRUCache<Key_t, Value_t, Tag_t>::list_append(Node_t* list, Node_t* e) {
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-typename LRUCache<Key_t, Value_t, Tag_t>::Node_t*
+inline typename LRUCache<Key_t, Value_t, Tag_t>::Node_t*
 LRUCache<Key_t, Value_t, Tag_t>::lru_refresh(Node_t* e) {
   assert(e != &lru_);
   assert(e->refs == 1);
@@ -370,8 +372,8 @@ LRUCache<Key_t, Value_t, Tag_t>::lru_refresh(Node_t* e) {
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-std::ostream& LRUCache<Key_t, Value_t, Tag_t>::print(std::ostream& os,
-                                                     int indent) const {
+inline std::ostream& LRUCache<Key_t, Value_t, Tag_t>::print(std::ostream& os,
+                                                            int indent) const {
   os << "LRUCache (capacity=" << capacity_ << ") {\n";
   for (int i = 0; i < indent + 1; ++i) os << '\t';
   os << "lru:    [";

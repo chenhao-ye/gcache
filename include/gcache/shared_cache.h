@@ -86,7 +86,7 @@ void SharedCache<Tag_t, Key_t, Value_t>::init(
 
 template <typename Tag_t, typename Key_t, typename Value_t>
 template <typename Fn>
-void SharedCache<Tag_t, Key_t, Value_t>::init(
+inline void SharedCache<Tag_t, Key_t, Value_t>::init(
     const std::vector<std::pair<Tag_t, size_t>>& tenant_configs, Fn&& fn) {
   init(tenant_configs);
   for (size_t i = 0; i < total_capacity_; ++i) {
@@ -130,7 +130,7 @@ SharedCache<Tag_t, Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
-void SharedCache<Tag_t, Key_t, Value_t>::release(
+inline void SharedCache<Tag_t, Key_t, Value_t>::release(
     typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t handle) {
   Tag_t tag = handle.node->tag;
   assert(tenant_cache_map_.contains(tag));
@@ -138,7 +138,7 @@ void SharedCache<Tag_t, Key_t, Value_t>::release(
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
-void SharedCache<Tag_t, Key_t, Value_t>::pin(
+inline void SharedCache<Tag_t, Key_t, Value_t>::pin(
     typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t handle) {
   Tag_t tag = handle.node->tag;
   assert(tenant_cache_map_.contains(tag));
@@ -146,8 +146,8 @@ void SharedCache<Tag_t, Key_t, Value_t>::pin(
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
-size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
-                                                    size_t size) {
+inline size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
+                                                           size_t size) {
   assert(tenant_cache_map_.contains(src));
   assert(tenant_cache_map_.contains(dst));
 
@@ -163,8 +163,8 @@ size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
-std::ostream& SharedCache<Tag_t, Key_t, Value_t>::print(std::ostream& os,
-                                                        int indent) const {
+inline std::ostream& SharedCache<Tag_t, Key_t, Value_t>::print(
+    std::ostream& os, int indent) const {
   os << "Tenant Cache Map {" << std::endl;
   for (auto& [tag, cache] : tenant_cache_map_) {
     for (int i = 0; i < indent + 1; ++i) os << '\t';

@@ -43,7 +43,7 @@ class LRUCache {
   // return the existing one; if it is known for sure that the key must not
   // exist, set not_exist to true to skip a lookup
   Handle_t insert(Key_t key, uint32_t hash, bool pin = false,
-                  bool not_exist = false);
+                  bool hint_nonexist = false);
   // Search for a handle; return nullptr if not exist
   Handle_t lookup(Key_t key, uint32_t hash, bool pin = false);
   // Release pinned handle returned by insert/lookup
@@ -202,16 +202,18 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::init_from(
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
 LRUCache<Key_t, Value_t, Tag_t>::insert(Key_t key, uint32_t hash, bool pin,
-                                        bool not_exist) {
+                                        bool hint_nonexist) {
   // Disable support for capacity_ == 0; the user must set capacity first
   assert(capacity_ > 0);
 
   // Search to see if already exists
   Node_t* e;
 
-  if (!not_exist) {  // if not sure whether the key exists, do lookup
+  if (!hint_nonexist) {  // if not sure whether the key exists, do lookup
     e = lookup(key, hash, pin).node;
     if (e) return e;
+  } else {
+    assert(!lookup(key, hash, pin).node);  // check if hint is correct
   }
 
   e = alloc_handle();

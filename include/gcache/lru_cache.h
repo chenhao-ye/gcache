@@ -240,7 +240,9 @@ LRUCache<Key_t, Value_t, Tag_t>::lookup(Key_t key, uint32_t hash, bool pin) {
 
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline void LRUCache<Key_t, Value_t, Tag_t>::release(Handle_t handle) {
+  assert(handle.get_refs() > 1);
   unref(handle.node);
+  assert(handle.get_refs() > 0);
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>

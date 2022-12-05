@@ -73,7 +73,7 @@ void test2() {
 }
 
 void bench1() {
-  GhostCache ghost_cache(bench_size / 16, bench_size / 16, bench_size);
+  GhostCache ghost_cache(bench_size / 32, bench_size / 32, bench_size);
 
   // filling the cache
   auto ts0 = rdtsc();
@@ -111,7 +111,7 @@ void bench1() {
 }
 
 void bench2() {
-  SampleGhostCache<5> sample_ghost_cache(bench_size / 16, bench_size / 16,
+  SampleGhostCache<5> sample_ghost_cache(bench_size / 32, bench_size / 32,
                                          bench_size);
 
   // filling the cache
@@ -136,8 +136,8 @@ void bench2() {
 }
 
 void bench3() {
-  GhostCache ghost_cache(bench_size / 16, bench_size / 16, bench_size);
-  SampleGhostCache<5> sample_ghost_cache(bench_size / 16, bench_size / 16,
+  GhostCache ghost_cache(bench_size / 32, bench_size / 32, bench_size);
+  SampleGhostCache<7> sample_ghost_cache(bench_size / 32, bench_size / 32,
                                          bench_size);
 
   // filling the cache
@@ -178,7 +178,7 @@ void bench3() {
       << "  size          w/o sampling                 w/ sampling        \n";
   std::cout
       << "----------------------------------------------------------------\n";
-  for (uint32_t s = bench_size / 16; s <= bench_size; s += bench_size / 16) {
+  for (uint32_t s = bench_size / 32; s <= bench_size; s += bench_size / 32) {
     std::cout << std::setw(7) << s / 1024 << "K ";
     ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';
@@ -191,10 +191,10 @@ void bench3() {
 }
 
 void bench4() {
-  GhostCache ghost_cache(large_bench_size / 16, large_bench_size / 16,
+  GhostCache ghost_cache(large_bench_size / 32, large_bench_size / 32,
                          large_bench_size);
-  SampleGhostCache<5> sample_ghost_cache(
-      large_bench_size / 16, large_bench_size / 16, large_bench_size);
+  SampleGhostCache<7> sample_ghost_cache(
+      large_bench_size / 32, large_bench_size / 32, large_bench_size);
 
   // filling the cache
   std::vector<uint32_t> reqs;
@@ -233,8 +233,8 @@ void bench4() {
       << "  size          w/o sampling                 w/ sampling        \n";
   std::cout
       << "----------------------------------------------------------------\n";
-  for (uint32_t s = large_bench_size / 16; s <= large_bench_size;
-       s += large_bench_size / 16) {
+  for (uint32_t s = large_bench_size / 32; s <= large_bench_size;
+       s += large_bench_size / 32) {
     std::cout << std::setw(7) << s / 1024 << "K ";
     ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';
@@ -247,10 +247,10 @@ void bench4() {
 }
 
 void bench5() {
-  GhostCache ghost_cache(large_bench_size / 16, large_bench_size / 16,
+  GhostCache ghost_cache(large_bench_size / 32, large_bench_size / 32,
                          large_bench_size);
-  SampleGhostCache<5> sample_ghost_cache(
-      large_bench_size / 16, large_bench_size / 16, large_bench_size);
+  SampleGhostCache<7> sample_ghost_cache(
+      large_bench_size / 32, large_bench_size / 32, large_bench_size);
 
   // filling the cache
   std::vector<uint32_t> reqs;
@@ -281,8 +281,8 @@ void bench5() {
       << "  size          w/o sampling                 w/ sampling        \n";
   std::cout
       << "----------------------------------------------------------------\n";
-  for (uint32_t s = large_bench_size / 16; s <= large_bench_size;
-       s += large_bench_size / 16) {
+  for (uint32_t s = large_bench_size / 32; s <= large_bench_size;
+       s += large_bench_size / 32) {
     std::cout << std::setw(7) << s / 1024 << "K ";
     ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';

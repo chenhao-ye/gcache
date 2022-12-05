@@ -156,8 +156,8 @@ class GhostCache {
   }
 };
 
-// only sample 1/32 (~3%)
-template <uint32_t SampleShift = 5>
+// only sample 1/128 (~00.78%)
+template <uint32_t SampleShift = 7>
 class SampleGhostCache : public GhostCache {
  public:
   SampleGhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)

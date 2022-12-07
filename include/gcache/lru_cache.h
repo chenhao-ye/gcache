@@ -32,6 +32,8 @@ class LRUCache {
   template <typename Fn>
   void init(size_t capacity, Fn&& fn);
 
+  size_t capacity() { return capacity_; }
+
   // For each item in the cache, call fn(key, handle)
   template <typename Fn>
   void for_each(Fn&& fn);
@@ -281,11 +283,13 @@ LRUCache<Key_t, Value_t, Tag_t>::preempt() {
   // immediately, return it out to caller (i.e. SharedCache)
   // We keep this function independent from `alloc_handle` to make it
   // semantically clear
+  --capacity_;
   return alloc_handle();
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline void LRUCache<Key_t, Value_t, Tag_t>::assign(Handle_t e) {
+  ++capacity_;
   free_handle(e.node);
 }
 

@@ -14,6 +14,8 @@ constexpr const uint32_t num_ops = 32 * 1024 * 1024;
 constexpr const uint32_t bench_size = 256 * 1024;             // 1 GB cache
 constexpr const uint32_t large_bench_size = 2 * 1024 * 1024;  // 8 GB cache
 
+constexpr const uint32_t sample_rate = 5;
+
 void test1() {
   GhostCache ghost_cache(1, 3, 6);
   std::cout << "=== Test 1 ===\n";
@@ -111,8 +113,8 @@ void bench1() {
 }
 
 void bench2() {
-  SampleGhostCache<5> sample_ghost_cache(bench_size / 32, bench_size / 32,
-                                         bench_size);
+  SampleGhostCache<sample_rate> sample_ghost_cache(bench_size / 32,
+                                                   bench_size / 32, bench_size);
 
   // filling the cache
   auto ts0 = rdtsc();
@@ -137,8 +139,8 @@ void bench2() {
 
 void bench3() {
   GhostCache ghost_cache(bench_size / 32, bench_size / 32, bench_size);
-  SampleGhostCache<7> sample_ghost_cache(bench_size / 32, bench_size / 32,
-                                         bench_size);
+  SampleGhostCache<sample_rate> sample_ghost_cache(bench_size / 32,
+                                                   bench_size / 32, bench_size);
 
   // filling the cache
   std::vector<uint32_t> reqs;
@@ -193,7 +195,7 @@ void bench3() {
 void bench4() {
   GhostCache ghost_cache(large_bench_size / 32, large_bench_size / 32,
                          large_bench_size);
-  SampleGhostCache<7> sample_ghost_cache(
+  SampleGhostCache<sample_rate> sample_ghost_cache(
       large_bench_size / 32, large_bench_size / 32, large_bench_size);
 
   // filling the cache
@@ -249,7 +251,7 @@ void bench4() {
 void bench5() {
   GhostCache ghost_cache(large_bench_size / 32, large_bench_size / 32,
                          large_bench_size);
-  SampleGhostCache<7> sample_ghost_cache(
+  SampleGhostCache<sample_rate> sample_ghost_cache(
       large_bench_size / 32, large_bench_size / 32, large_bench_size);
 
   // filling the cache

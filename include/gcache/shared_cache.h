@@ -49,7 +49,7 @@ class SharedCache {
   // it is unclear whether it is useful in the real cache
 
   // Relocate some handles (i.e. cache slots) from src to dst; the relocation
-  // may be terminated early if dst does not have enough available handles to
+  // may be terminated early if src does not have enough available handles to
   // return; return number of handles relocated successfully
   size_t relocate(Tag_t src, Tag_t dst, size_t size);
 

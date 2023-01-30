@@ -25,6 +25,6 @@ set(SOURCE_FILES
 	include/gcache/shared_cache.h)
 
 include_directories(include)
-add_executable(gcache_bench_lru ${SOURCE_FILES} benchmarks/bench_lru.cpp)
-add_executable(gcache_bench_shared ${SOURCE_FILES} benchmarks/bench_shared.cpp)
-add_executable(gcache_bench_ghost ${SOURCE_FILES} benchmarks/bench_ghost.cpp)
+add_executable(gcache_test_lru ${SOURCE_FILES} tests/test_lru.cpp)
+add_executable(gcache_test_shared ${SOURCE_FILES} tests/test_shared.cpp)
+add_executable(gcache_test_ghost ${SOURCE_FILES} tests/test_ghost.cpp)

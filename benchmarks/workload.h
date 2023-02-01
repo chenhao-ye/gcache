@@ -41,7 +41,7 @@ struct UnifGenerator : public BaseGenerator {
 };
 
 struct ZipfGenerator : public BaseGenerator {
-  std::mt19937 rng{std::random_device{}()};
+  std::mt19937 rng{/*seed*/ 0x537};
   std::uniform_real_distribution<double> dist{0, 1};
   const off_t align;
   const double theta;

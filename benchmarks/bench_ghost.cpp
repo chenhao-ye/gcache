@@ -13,7 +13,7 @@ constexpr static uint64_t size = 1024 * 1024 * 1024 / 4096;  // 1 GB
 constexpr static uint64_t num_ops = 1'000'000'000;
 constexpr static double zipf_theta = 0.99;
 
-constexpr const uint32_t cache_tick = size / 64;
+constexpr const uint32_t cache_tick = size / 32;
 constexpr const uint32_t cache_min = cache_tick;
 constexpr const uint32_t cache_max = size;
 constexpr const uint32_t sample_rate = 5;

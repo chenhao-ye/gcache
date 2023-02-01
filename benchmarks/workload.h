@@ -32,16 +32,18 @@ struct SeqGenerator : public BaseGenerator {
 };
 
 struct UnifGenerator : public BaseGenerator {
-  std::mt19937 rng{/*seed*/ 0x537};
+  std::mt19937 rng;
   std::uniform_int_distribution<off_t> dist;
   const off_t align;
-  UnifGenerator(off_t min, off_t max, off_t align)
-      : dist(div_ceil(min, align), (max - 1) / align), align(align) {}
+  UnifGenerator(off_t min, off_t max, off_t align, uint64_t seed)
+      : rng(seed),
+        dist(div_ceil(min, align), (max - 1) / align),
+        align(align) {}
   off_t get() { return dist(rng) * align; }
 };
 
 struct ZipfGenerator : public BaseGenerator {
-  std::mt19937 rng{/*seed*/ 0x537};
+  std::mt19937_64 rng;
   std::uniform_real_distribution<double> dist{0, 1};
   const off_t align;
   const double theta;
@@ -49,8 +51,9 @@ struct ZipfGenerator : public BaseGenerator {
   const off_t min;
   const double denom;
   const double eta;
-  ZipfGenerator(off_t min, off_t max, double theta, off_t align)
-      : align(align),
+  ZipfGenerator(off_t min, off_t max, double theta, off_t align, uint64_t seed)
+      : rng(seed),
+        align(align),
         theta(theta),
         n((max - min) / align),
         min(round_up(min, align)),
@@ -100,8 +103,8 @@ struct Offsets {
   };
 
   Offsets(size_t num, const OffsetType type, uint64_t size, off_t align,
-          double zipf_theta = 0)
-      : num(num), gen(get_generator(type, size, align, zipf_theta)) {}
+          double zipf_theta = 0, uint64_t seed = 0x537)
+      : num(num), gen(get_generator(type, size, align, zipf_theta, seed)) {}
   Offsets(const Offsets&) = delete;
   ~Offsets() { delete gen; }
 
@@ -110,14 +113,15 @@ struct Offsets {
   [[nodiscard]] size_t size() const { return num; }
 
   static BaseGenerator* get_generator(const OffsetType type, uint64_t size,
-                                      off_t align, double zipf_theta = 0) {
+                                      off_t align, double zipf_theta,
+                                      uint64_t seed) {
     switch (type) {
       case OffsetType::SEQ:
         return new SeqGenerator(0, size - 1, align);
       case OffsetType::UNIF:
-        return new UnifGenerator(0, size - 1, align);
+        return new UnifGenerator(0, size - 1, align, seed);
       case OffsetType::ZIPF:
-        return new ZipfGenerator(0, size - 1, zipf_theta, align);
+        return new ZipfGenerator(0, size - 1, zipf_theta, align, seed);
       default:
         throw std::runtime_error("Unimplemented offset type");
     }

@@ -1,6 +1,7 @@
 // A bench process will evaluate 1) accuracy of sampled ghost cache
 // 2) performance
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <fstream>
@@ -62,10 +63,11 @@ int main() {
   ghost_cache.reset_stat();
   sample_ghost_cache.reset_stat();
   std::cout << "Preheat completes in "
-            << std::chrono::duration_cast<std::chrono::microseconds>(
+            << std::chrono::duration_cast<std::chrono::milliseconds>(
                    preheat_end_ts - preheat_begin_ts)
-                   .count()
-            << " us" << std::endl;
+                       .count() /
+                   1000.0
+            << " sec" << std::endl;
 
   // start benchmarking
   auto t0 = std::chrono::high_resolution_clock::now();
@@ -108,6 +110,29 @@ int main() {
             << " us/op\n";
   std::cout << "Sampled Overhead:    " << double(t_sample - t_base) / num_ops
             << " us/op\n";
+
+  // dump the ghost cache status
+  std::vector<double> hit_rate_diff;
+  std::ofstream ofs_ghost("./hit_rate_ghost.csv");
+  std::ofstream ofs_sample("./hit_rate_sampled.csv");
+
+  ofs_ghost << "size,hit_rate\n";
+  ofs_sample << "size,hit_rate\n";
+  for (size_t i = cache_min; i <= cache_max; i += cache_tick) {
+    double hr1 = ghost_cache.get_hit_rate(i);
+    double hr2 = sample_ghost_cache.get_hit_rate(i);
+    ofs_ghost << i << ',' << hr1 << '\n';
+    ofs_sample << i << ',' << hr2 << '\n';
+    hit_rate_diff.emplace_back(std::abs(hr1 - hr2));
+  }
+  std::cout << "Avg Error: "
+            << std::accumulate(hit_rate_diff.begin(), hit_rate_diff.end(),
+                               0.0) /
+                   hit_rate_diff.size()
+            << std::endl;
+  std::cout << "Max Error: "
+            << *std::max_element(hit_rate_diff.begin(), hit_rate_diff.end())
+            << std::endl;
 
   return 0;
 }

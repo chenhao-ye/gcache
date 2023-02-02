@@ -4,8 +4,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <ostream>
 
 #include "gcache/ghost_cache.h"
 #include "workload.h"
@@ -21,6 +24,8 @@ static uint32_t cache_tick = num_blocks / 32;
 static uint32_t cache_min = cache_tick;
 static uint32_t cache_max = num_blocks;
 
+static std::filesystem::path result_dir = ".";
+
 void parse_args(int argc, char* argv[]) {
   char junk;
   uint64_t n;
@@ -34,8 +39,15 @@ void parse_args(int argc, char* argv[]) {
       } else if (strcmp(argv[i] + 11, "seq") == 0) {
         type = OffsetType::SEQ;
       } else {
-        std::cerr << "Invalid args: Unrecognized workload: " << argv[i] + 11
+        std::cerr << "Invalid argument: Unrecognized workload: " << argv[i] + 11
                   << std::endl;
+        exit(1);
+      }
+    } else if (strncmp(argv[i], "--result_dir=", 13) == 0) {
+      result_dir = argv[i] + 13;
+      if (!std::filesystem::is_directory(result_dir)) {
+        std::cerr << "Invalid argument: result_dir is not a valid directory: "
+                  << result_dir << std::endl;
         exit(1);
       }
     } else if (sscanf(argv[i], "--working_set=%ld%c", &n, &junk) == 1) {
@@ -54,7 +66,7 @@ void parse_args(int argc, char* argv[]) {
     } else if (sscanf(argv[i], "--cache_max=%ld%c", &n, &junk) == 1) {
       cache_max = n;
     } else {
-      std::cerr << "Invalid args: " << argv[i] << std::endl;
+      std::cerr << "Invalid argument: " << argv[i] << std::endl;
       exit(1);
     }
   }
@@ -162,8 +174,9 @@ int main(int argc, char* argv[]) {
 
   // dump the ghost cache status
   std::vector<double> hit_rate_diff;
-  std::ofstream ofs_ghost("./hit_rate_ghost.csv");
-  std::ofstream ofs_sample("./hit_rate_sampled.csv");
+
+  std::ofstream ofs_ghost(result_dir / "hit_rate_ghost.csv");
+  std::ofstream ofs_sample(result_dir / "hit_rate_sampled.csv");
 
   ofs_ghost << "num_blocks,hit_rate\n";
   ofs_sample << "num_blocks,hit_rate\n";

@@ -10,18 +10,67 @@
 #include "gcache/ghost_cache.h"
 #include "workload.h"
 
-constexpr static OffsetType type = OffsetType::ZIPF;
-constexpr static uint64_t size = 1024 * 1024 * 1024 / 4096;  // 1 GB
-constexpr static uint64_t num_ops = 1'000'000'000;
-constexpr static uint64_t preheat_num_ops = num_ops / 10;
-constexpr static double zipf_theta = 0.99;
-
-constexpr const uint32_t cache_tick = size / 32;
-constexpr const uint32_t cache_min = cache_tick;
-constexpr const uint32_t cache_max = size;
 constexpr const uint32_t sample_rate = 5;
+static OffsetType type = OffsetType::ZIPF;
+static uint64_t num_blocks = 1024 * 1024 * 1024 / 4096;  // 1 GB
+static uint64_t num_ops = 1'000'000'000;
+static uint64_t preheat_num_ops = num_ops / 10;
+static double zipf_theta = 0.99;
 
-int main() {
+static uint32_t cache_tick = num_blocks / 32;
+static uint32_t cache_min = cache_tick;
+static uint32_t cache_max = num_blocks;
+
+void parse_args(int argc, char* argv[]) {
+  char junk;
+  uint64_t n;
+  double f;
+  for (int i = 1; i < argc; ++i) {
+    if (strncmp(argv[i], "--workload=", 11) == 0) {
+      if (strcmp(argv[i] + 11, "zipf") == 0) {
+        type = OffsetType::ZIPF;
+      } else if (strcmp(argv[i] + 11, "unif") == 0) {
+        type = OffsetType::UNIF;
+      } else if (strcmp(argv[i] + 11, "seq") == 0) {
+        type = OffsetType::SEQ;
+      } else {
+        std::cerr << "Invalid args: Unrecognized workload: " << argv[i] + 11
+                  << std::endl;
+        exit(1);
+      }
+    } else if (sscanf(argv[i], "--working_set=%ld%c", &n, &junk) == 1) {
+      num_blocks = n / 4096;  // this is just a shortcut for num_blocks
+    } else if (sscanf(argv[i], "--num_blocks=%ld%c", &n, &junk) == 1) {
+      num_blocks = n;
+    } else if (sscanf(argv[i], "--num_ops=%ld%c", &n, &junk) == 1) {
+      num_ops = n;
+      preheat_num_ops = num_ops / 10;
+    } else if (sscanf(argv[i], "--zipf_theta=%lf%c", &f, &junk) == 1) {
+      zipf_theta = f;
+    } else if (sscanf(argv[i], "--cache_tick=%ld%c", &n, &junk) == 1) {
+      cache_tick = n;
+    } else if (sscanf(argv[i], "--cache_min=%ld%c", &n, &junk) == 1) {
+      cache_min = n;
+    } else if (sscanf(argv[i], "--cache_max=%ld%c", &n, &junk) == 1) {
+      cache_max = n;
+    } else {
+      std::cerr << "Invalid args: " << argv[i] << std::endl;
+      exit(1);
+    }
+  }
+  if (cache_min > cache_max) {
+    std::cerr << "Invalid cache configs: cache_min > cache_max" << std::endl;
+    exit(1);
+  }
+  if ((cache_max - cache_min) % cache_tick != 0) {
+    std::cerr << "Invalid cache configs: Invalid cache_tick" << std::endl;
+    exit(1);
+  }
+}
+
+int main(int argc, char* argv[]) {
+  parse_args(argc, argv);
+
   std::cout << "Config: type=";
   switch (type) {
     case OffsetType::SEQ:
@@ -36,14 +85,14 @@ int main() {
     default:
       throw std::runtime_error("Unimplemented offset type");
   }
-  std::cout << ", size=" << size << ", num_ops=" << num_ops
+  std::cout << ", num_blocks=" << num_blocks << ", num_ops=" << num_ops
             << ", zipf_theta=" << zipf_theta << ", cache_tick=" << cache_tick
             << ", cache_min=" << cache_min << ", cache_max=" << cache_max
             << ", sample_rate=" << sample_rate << std::endl;
 
-  Offsets offsets1(num_ops, type, size, 1, zipf_theta);
-  Offsets offsets2(num_ops, type, size, 1, zipf_theta);
-  Offsets offsets3(num_ops, type, size, 1, zipf_theta);
+  Offsets offsets1(num_ops, type, num_blocks, 1, zipf_theta);
+  Offsets offsets2(num_ops, type, num_blocks, 1, zipf_theta);
+  Offsets offsets3(num_ops, type, num_blocks, 1, zipf_theta);
 
   uint64_t offset_checksum1 = 0, offset_checksum2 = 0, offset_checksum3 = 0;
 
@@ -52,7 +101,7 @@ int main() {
       cache_tick, cache_min, cache_max);
 
   // preheat: run a subset of stream to populate the cache
-  Offsets prehead_offsets(preheat_num_ops, type, size, 1, zipf_theta,
+  Offsets prehead_offsets(preheat_num_ops, type, num_blocks, 1, zipf_theta,
                           /*seed*/ 0x736);
   auto preheat_begin_ts = std::chrono::high_resolution_clock::now();
   for (auto off : prehead_offsets) {
@@ -116,8 +165,8 @@ int main() {
   std::ofstream ofs_ghost("./hit_rate_ghost.csv");
   std::ofstream ofs_sample("./hit_rate_sampled.csv");
 
-  ofs_ghost << "size,hit_rate\n";
-  ofs_sample << "size,hit_rate\n";
+  ofs_ghost << "num_blocks,hit_rate\n";
+  ofs_sample << "num_blocks,hit_rate\n";
   for (size_t i = cache_min; i <= cache_max; i += cache_tick) {
     double hr1 = ghost_cache.get_hit_rate(i);
     double hr2 = sample_ghost_cache.get_hit_rate(i);

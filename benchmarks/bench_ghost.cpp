@@ -13,8 +13,12 @@
 #include "gcache/ghost_cache.h"
 #include "workload.h"
 
-constexpr const uint32_t sample_rate = 5;
-static OffsetType type = OffsetType::ZIPF;
+// use compile-time macro to set this
+#ifndef SAMPLE_SHIFT
+#define SAMPLE_SHIFT 5
+#endif
+
+static OffsetType wl_type = OffsetType::ZIPF;
 static uint64_t num_blocks = 1024 * 1024 * 1024 / 4096;  // 1 GB
 static uint64_t num_ops = 1'000'000'000;
 static uint64_t preheat_num_ops = num_ops / 10;
@@ -33,11 +37,11 @@ void parse_args(int argc, char* argv[]) {
   for (int i = 1; i < argc; ++i) {
     if (strncmp(argv[i], "--workload=", 11) == 0) {
       if (strcmp(argv[i] + 11, "zipf") == 0) {
-        type = OffsetType::ZIPF;
+        wl_type = OffsetType::ZIPF;
       } else if (strcmp(argv[i] + 11, "unif") == 0) {
-        type = OffsetType::UNIF;
+        wl_type = OffsetType::UNIF;
       } else if (strcmp(argv[i] + 11, "seq") == 0) {
-        type = OffsetType::SEQ;
+        wl_type = OffsetType::SEQ;
       } else {
         std::cerr << "Invalid argument: Unrecognized workload: " << argv[i] + 11
                   << std::endl;
@@ -83,8 +87,8 @@ void parse_args(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
   parse_args(argc, argv);
 
-  std::cout << "Config: type=";
-  switch (type) {
+  std::cout << "Config: wl_type=";
+  switch (wl_type) {
     case OffsetType::SEQ:
       std::cout << "seq";
       break;
@@ -95,25 +99,25 @@ int main(int argc, char* argv[]) {
       std::cout << "zipf";
       break;
     default:
-      throw std::runtime_error("Unimplemented offset type");
+      throw std::runtime_error("Unimplemented offset wl_type");
   }
   std::cout << ", num_blocks=" << num_blocks << ", num_ops=" << num_ops
             << ", zipf_theta=" << zipf_theta << ", cache_tick=" << cache_tick
             << ", cache_min=" << cache_min << ", cache_max=" << cache_max
-            << ", sample_rate=" << sample_rate << std::endl;
+            << ", SAMPLE_SHIFT=" << SAMPLE_SHIFT << std::endl;
 
-  Offsets offsets1(num_ops, type, num_blocks, 1, zipf_theta);
-  Offsets offsets2(num_ops, type, num_blocks, 1, zipf_theta);
-  Offsets offsets3(num_ops, type, num_blocks, 1, zipf_theta);
+  Offsets offsets1(num_ops, wl_type, num_blocks, 1, zipf_theta);
+  Offsets offsets2(num_ops, wl_type, num_blocks, 1, zipf_theta);
+  Offsets offsets3(num_ops, wl_type, num_blocks, 1, zipf_theta);
 
   uint64_t offset_checksum1 = 0, offset_checksum2 = 0, offset_checksum3 = 0;
 
   gcache::GhostCache ghost_cache(cache_tick, cache_min, cache_max);
-  gcache::SampleGhostCache<sample_rate> sample_ghost_cache(
+  gcache::SampleGhostCache<SAMPLE_SHIFT> sample_ghost_cache(
       cache_tick, cache_min, cache_max);
 
   // preheat: run a subset of stream to populate the cache
-  Offsets prehead_offsets(preheat_num_ops, type, num_blocks, 1, zipf_theta,
+  Offsets prehead_offsets(preheat_num_ops, wl_type, num_blocks, 1, zipf_theta,
                           /*seed*/ 0x736);
   auto preheat_begin_ts = std::chrono::high_resolution_clock::now();
   for (auto off : prehead_offsets) {
@@ -176,7 +180,7 @@ int main(int argc, char* argv[]) {
   std::vector<double> hit_rate_diff;
 
   std::ofstream ofs_ghost(result_dir / "hit_rate_ghost.csv");
-  std::ofstream ofs_sample(result_dir / "hit_rate_sampled.csv");
+  std::ofstream ofs_sample(result_dir / "hit_rate_sample.csv");
 
   ofs_ghost << "num_blocks,hit_rate\n";
   ofs_sample << "num_blocks,hit_rate\n";

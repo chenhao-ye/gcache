@@ -1,16 +1,11 @@
 import pandas as pd
-import numpy as np
 import math
 import matplotlib.pyplot as plt
 from typing import List, Tuple
+from plot_util import *
 
 
-def get_subplots(nrows: int, ncols: int):
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
-    return fig, axes
-
-
-def load_data(name: str):
+def load_hit_rate_data(name: str):
     ghost_df = pd.read_csv(f"results/{name}/hit_rate_ghost.csv",
                            na_values="nan",
                            skipinitialspace=True)
@@ -39,12 +34,15 @@ def get_motiv(df: pd.DataFrame) -> Tuple[List[float], List[float]]:
 
 
 if __name__ == "__main__":
-    fig, ax = get_subplots(1, 1)
+    fig, ax = get_subplots(nrows=1, ncols=1)
     for name in [
-            "zipf_s1G_z0.99", "unif_s1G", "unif_s0.75G", "unif_s0.5G",
-            "unif_s0.25G", "seq_s2G"
+            "zipf_s1G_z0.99",
+            "unif_s1G",
+            "unif_s0.75G",
+            "unif_s0.5G",
+            "unif_s0.25G",
     ]:
-        ghost_df, _ = load_data(name)
+        ghost_df, _ = load_hit_rate_data(name)
         x, y = get_motiv(ghost_df)
         ax.plot(x, y, label=name)
         print(f"{name}: size:  {x}")

@@ -87,16 +87,25 @@ void parse_args(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
   parse_args(argc, argv);
 
+  // we dump all config and data into a csv file for parser
+  std::ofstream ofs_perf(result_dir / "perf.csv");
+  ofs_perf << "workload,num_blocks,num_ops,zipf_theta,cache_tick,cache_min,"
+              "cache_max,sample_shift,baseline_us,ghost_us,sampled_us,"
+              "ghost_cost_uspop,sampled_cost_uspop,avg_err,max_err\n";
+
   std::cout << "Config: wl_type=";
   switch (wl_type) {
     case OffsetType::SEQ:
       std::cout << "seq";
+      ofs_perf << "seq";
       break;
     case OffsetType::UNIF:
       std::cout << "unif";
+      ofs_perf << "unif";
       break;
     case OffsetType::ZIPF:
       std::cout << "zipf";
+      ofs_perf << "zipf";
       break;
     default:
       throw std::runtime_error("Unimplemented offset wl_type");
@@ -104,7 +113,10 @@ int main(int argc, char* argv[]) {
   std::cout << ", num_blocks=" << num_blocks << ", num_ops=" << num_ops
             << ", zipf_theta=" << zipf_theta << ", cache_tick=" << cache_tick
             << ", cache_min=" << cache_min << ", cache_max=" << cache_max
-            << ", SAMPLE_SHIFT=" << SAMPLE_SHIFT << std::endl;
+            << ", sample_shift=" << SAMPLE_SHIFT << std::endl;
+  ofs_perf << ',' << num_blocks << ',' << num_ops << ',' << zipf_theta << ','
+           << cache_tick << ',' << cache_min << ',' << cache_max << ','
+           << SAMPLE_SHIFT;
 
   Offsets offsets1(num_ops, wl_type, num_blocks, 1, zipf_theta);
   Offsets offsets2(num_ops, wl_type, num_blocks, 1, zipf_theta);
@@ -127,6 +139,7 @@ int main(int argc, char* argv[]) {
   auto preheat_end_ts = std::chrono::high_resolution_clock::now();
   ghost_cache.reset_stat();
   sample_ghost_cache.reset_stat();
+  // for human's reference only, not used for any data processing purposes
   std::cout << "Preheat completes in "
             << std::chrono::duration_cast<std::chrono::milliseconds>(
                    preheat_end_ts - preheat_begin_ts)
@@ -166,15 +179,16 @@ int main(int argc, char* argv[]) {
       std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
   uint64_t t_sample =
       std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
+  double ghost_overhead = double(t_ghost - t_base) / num_ops;
+  double sampled_overhead = double(t_sample - t_base) / num_ops;
 
   std::cout << "Baseline:            " << t_base << " us\n";
   std::cout << "Ghost Cache:         " << t_ghost << " us\n";
   std::cout << "Sampled Ghost Cache: " << t_sample << " us\n";
-
-  std::cout << "Ghost Overhead:      " << double(t_ghost - t_base) / num_ops
-            << " us/op\n";
-  std::cout << "Sampled Overhead:    " << double(t_sample - t_base) / num_ops
-            << " us/op\n";
+  std::cout << "Ghost Overhead:      " << ghost_overhead << " us/op\n";
+  std::cout << "Sampled Overhead:    " << sampled_overhead << " us/op\n";
+  ofs_perf << ',' << t_base << ',' << t_ghost << ',' << t_sample << ','
+           << ghost_overhead << ',' << sampled_overhead;
 
   // dump the ghost cache status
   std::vector<double> hit_rate_diff;
@@ -191,14 +205,16 @@ int main(int argc, char* argv[]) {
     ofs_sample << i << ',' << hr2 << '\n';
     hit_rate_diff.emplace_back(std::abs(hr1 - hr2));
   }
-  std::cout << "Avg Error: "
-            << std::accumulate(hit_rate_diff.begin(), hit_rate_diff.end(),
-                               0.0) /
-                   hit_rate_diff.size()
-            << std::endl;
-  std::cout << "Max Error: "
-            << *std::max_element(hit_rate_diff.begin(), hit_rate_diff.end())
-            << std::endl;
+
+  // mean absolute error (MAE)
+  double avg_err =
+      std::accumulate(hit_rate_diff.begin(), hit_rate_diff.end(), 0.0) /
+      hit_rate_diff.size();
+  double max_err =
+      *std::max_element(hit_rate_diff.begin(), hit_rate_diff.end());
+  std::cout << "Avg Error: " << avg_err << std::endl;
+  std::cout << "Max Error: " << max_err << std::endl;
+  ofs_perf << ',' << avg_err << ',' << max_err << std::endl;
 
   return 0;
 }

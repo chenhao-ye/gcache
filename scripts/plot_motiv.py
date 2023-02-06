@@ -4,12 +4,13 @@ import matplotlib.pyplot as plt
 from typing import List, Tuple
 from plot_util import *
 
+results_dir = "results"
 
 def load_hit_rate_data(name: str):
-    ghost_df = pd.read_csv(f"results/{name}/hit_rate_ghost.csv",
+    ghost_df = pd.read_csv(f"{results_dir}/{name}/hit_rate_ghost.csv",
                            na_values="nan",
                            skipinitialspace=True)
-    sample_df = pd.read_csv(f"results/{name}/hit_rate_sample.csv",
+    sample_df = pd.read_csv(f"{results_dir}/{name}/hit_rate_sample.csv",
                             na_values="nan",
                             skipinitialspace=True)
     return ghost_df, sample_df

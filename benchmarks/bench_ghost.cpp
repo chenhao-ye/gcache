@@ -20,7 +20,7 @@
 
 static OffsetType wl_type = OffsetType::ZIPF;
 static uint64_t num_blocks = 1024 * 1024 * 1024 / 4096;  // 1 GB
-static uint64_t num_ops = 1'000'000'000;
+static uint64_t num_ops = 10'000'000; // 10M
 static uint64_t preheat_num_ops = num_ops / 10;
 static double zipf_theta = 0.99;
 
@@ -29,6 +29,9 @@ static uint32_t cache_min = cache_tick;
 static uint32_t cache_max = num_blocks;
 
 static std::filesystem::path result_dir = ".";
+
+static bool run_ghost = true;
+static bool run_sample = true;
 
 void parse_args(int argc, char* argv[]) {
   char junk;
@@ -69,6 +72,10 @@ void parse_args(int argc, char* argv[]) {
       cache_min = n;
     } else if (sscanf(argv[i], "--cache_max=%ld%c", &n, &junk) == 1) {
       cache_max = n;
+    } else if (strcmp(argv[i], "--no_ghost") == 0) {
+      run_ghost = false;
+    } else if (strcmp(argv[i], "--no_sampled") == 0) {
+      run_sample = false;
     } else {
       std::cerr << "Invalid argument: " << argv[i] << std::endl;
       exit(1);
@@ -133,8 +140,8 @@ int main(int argc, char* argv[]) {
                           /*seed*/ 0x736);
   auto preheat_begin_ts = std::chrono::high_resolution_clock::now();
   for (auto off : prehead_offsets) {
-    ghost_cache.access(off);
-    sample_ghost_cache.access(off);
+    if (run_ghost) ghost_cache.access(off);
+    if (run_sample) sample_ghost_cache.access(off);
   }
   auto preheat_end_ts = std::chrono::high_resolution_clock::now();
   ghost_cache.reset_stat();
@@ -155,32 +162,36 @@ int main(int argc, char* argv[]) {
   }
 
   auto t1 = std::chrono::high_resolution_clock::now();
-  for (auto off : offsets2) {
-    offset_checksum2 ^= off;
-    ghost_cache.access(off);
+  if (run_ghost) {
+    for (auto off : offsets2) {
+      offset_checksum2 ^= off;
+      ghost_cache.access(off);
+    }
   }
 
   auto t2 = std::chrono::high_resolution_clock::now();
-  for (auto off : offsets3) {
-    offset_checksum3 ^= off;
-    sample_ghost_cache.access(off);
+  if (run_sample) {
+    for (auto off : offsets3) {
+      offset_checksum3 ^= off;
+      sample_ghost_cache.access(off);
+    }
   }
   auto t3 = std::chrono::high_resolution_clock::now();
 
-  if (offset_checksum1 != offset_checksum2 ||
-      offset_checksum2 != offset_checksum3) {
-    std::cerr << "WARNING: offset checksums mismatch; random generator may not "
-                 "be deterministic!\n";
-  }
-
-  uint64_t t_base =
+  uint64_t t_base = 0, t_ghost = 0, t_sample = 0;
+  double ghost_overhead = 0, sampled_overhead = 0;
+  t_base =
       std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-  uint64_t t_ghost =
-      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-  uint64_t t_sample =
-      std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
-  double ghost_overhead = double(t_ghost - t_base) / num_ops;
-  double sampled_overhead = double(t_sample - t_base) / num_ops;
+  if (run_ghost) {
+    t_ghost =
+        std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+    ghost_overhead = double(t_ghost - t_base) / num_ops;
+  }
+  if (run_sample) {
+    t_sample =
+        std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
+    sampled_overhead = double(t_sample - t_base) / num_ops;
+  }
 
   std::cout << "Baseline:            " << t_base << " us\n";
   std::cout << "Ghost Cache:         " << t_ghost << " us\n";
@@ -190,28 +201,43 @@ int main(int argc, char* argv[]) {
   ofs_perf << ',' << t_base << ',' << t_ghost << ',' << t_sample << ','
            << ghost_overhead << ',' << sampled_overhead;
 
-  // dump the ghost cache status
-  std::vector<double> hit_rate_diff;
+  double avg_err = 0, max_err = 0;
 
-  std::ofstream ofs_ghost(result_dir / "hit_rate_ghost.csv");
-  std::ofstream ofs_sample(result_dir / "hit_rate_sample.csv");
+  if (run_ghost) {
+    if (offset_checksum1 != offset_checksum2)
+      std::cerr << "WARNING: offset checksums mismatch; "
+                   "random generator may not be deterministic!\n";
 
-  ofs_ghost << "num_blocks,hit_rate\n";
-  ofs_sample << "num_blocks,hit_rate\n";
-  for (size_t i = cache_min; i <= cache_max; i += cache_tick) {
-    double hr1 = ghost_cache.get_hit_rate(i);
-    double hr2 = sample_ghost_cache.get_hit_rate(i);
-    ofs_ghost << i << ',' << hr1 << '\n';
-    ofs_sample << i << ',' << hr2 << '\n';
-    hit_rate_diff.emplace_back(std::abs(hr1 - hr2));
+    std::ofstream ofs_ghost(result_dir / "hit_rate_ghost.csv");
+    ofs_ghost << "num_blocks,hit_rate\n";
+    for (size_t i = cache_min; i <= cache_max; i += cache_tick)
+      ofs_ghost << i << ',' << ghost_cache.get_hit_rate(i) << '\n';
   }
 
-  // mean absolute error (MAE)
-  double avg_err =
-      std::accumulate(hit_rate_diff.begin(), hit_rate_diff.end(), 0.0) /
-      hit_rate_diff.size();
-  double max_err =
-      *std::max_element(hit_rate_diff.begin(), hit_rate_diff.end());
+  if (run_sample) {
+    if (offset_checksum2 != offset_checksum3)
+      std::cerr << "WARNING: offset checksums mismatch; "
+                   "random generator may not be deterministic!\n";
+
+    std::ofstream ofs_sample(result_dir / "hit_rate_sample.csv");
+    ofs_sample << "num_blocks,hit_rate\n";
+    for (size_t i = cache_min; i <= cache_max; i += cache_tick)
+      ofs_sample << i << ',' << sample_ghost_cache.get_hit_rate(i) << '\n';
+  }
+
+  if (run_ghost && run_sample) {
+    std::vector<double> hit_rate_diff;  // dump the ghost cache status
+    for (size_t i = cache_min; i <= cache_max; i += cache_tick) {
+      double hr1 = ghost_cache.get_hit_rate(i);
+      double hr2 = sample_ghost_cache.get_hit_rate(i);
+      hit_rate_diff.emplace_back(std::abs(hr1 - hr2));
+    }
+    // mean absolute error (MAE)
+    avg_err = std::accumulate(hit_rate_diff.begin(), hit_rate_diff.end(), 0.0) /
+              hit_rate_diff.size();
+    max_err = *std::max_element(hit_rate_diff.begin(), hit_rate_diff.end());
+  }
+
   std::cout << "Avg Error: " << avg_err << std::endl;
   std::cout << "Max Error: " << max_err << std::endl;
   ofs_perf << ',' << avg_err << ',' << max_err << std::endl;

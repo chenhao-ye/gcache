@@ -2,7 +2,7 @@ import logging
 import os
 import pandas as pd
 
-results_dir = "./results"
+results_dir = "results"
 
 df_all = None
 

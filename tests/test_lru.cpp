@@ -123,6 +123,8 @@ void test() {
   std::cout << "\n=== Expect: lru: [5, 8, 9], in_use: [6] ===\n";
   std::cout << cache;
 
+  cache.release(h6);
+
   std::cout << std::flush;
 }
 

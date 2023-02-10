@@ -360,7 +360,7 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::try_refresh(Handle_t handle,
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline bool LRUCache<Key_t, Value_t, Tag_t>::export_handle(Handle_t handle) {
   Node_t* e = handle.node;
-  assert(!e);
+  assert(e);
   if (e->refs != 1) return false;
   list_remove(e);
   list_append(&exported_, e);

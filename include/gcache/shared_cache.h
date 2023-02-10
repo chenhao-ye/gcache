@@ -57,6 +57,10 @@ class SharedCache {
   // return; return number of handles relocated successfully
   size_t relocate(Tag_t src, Tag_t dst, size_t size);
 
+  // Similar to LRUCache export/import_handle
+  bool export_handle(Handle_t handle);
+  Handle_t import_handle(Tag_t tag, Key_t key, uint32_t hash);
+
  private:
   Node_t* pool_;
   size_t total_capacity_;
@@ -140,8 +144,7 @@ SharedCache<Tag_t, Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
-inline void SharedCache<Tag_t, Key_t, Value_t>::release(
-    typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t handle) {
+inline void SharedCache<Tag_t, Key_t, Value_t>::release(Handle_t handle) {
   Tag_t tag = handle.node->tag;
   assert(tenant_cache_map_.contains(tag));
   tenant_cache_map_[tag].release(handle);
@@ -170,6 +173,20 @@ inline size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
     dst_cache.assign(e);
   }
   return n;
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t>
+inline bool SharedCache<Tag_t, Key_t, Value_t>::export_handle(Handle_t handle) {
+  assert(tenant_cache_map_.contains(handle.node->tag));
+  return tenant_cache_map_[handle.node->tag].export_handle(handle);
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t>
+inline typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t
+SharedCache<Tag_t, Key_t, Value_t>::import_handle(Tag_t tag, Key_t key,
+                                                  uint32_t hash) {
+  assert(tenant_cache_map_.contains(tag));
+  return tenant_cache_map_[tag].import_handle(key, hash);
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>

@@ -72,6 +72,18 @@ void test1() {
   *h = 999;
   std::cout << "Expect: { 564: [6, 7, 8, 9], 537: [2] }" << std::endl;
   std::cout << shared_cache << std::endl;
+
+  // test export/import
+  bool success = shared_cache.export_handle(h);
+  assert(success);
+  std::cout << "Expect: { 564: [6, 7, 8], 537: [2] }" << std::endl;
+  std::cout << shared_cache << std::endl;
+
+  shared_cache.import_handle(537, 10, 1010);
+  shared_cache.import_handle(537, 11, 1111);
+  shared_cache.import_handle(564, 12, 1212);
+  std::cout << "Expect: { 564: [6, 7, 8, 12], 537: [2, 10, 11] }" << std::endl;
+  std::cout << shared_cache << std::endl;
 }
 
 int main() {

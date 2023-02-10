@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <stdexcept>
@@ -69,7 +70,7 @@ void test() {
 
   auto h5_ = cache.insert(5, 1005, true);
   assert(h5_ == h5);
-  *h5_ = 5555;
+  *h5_ = 555;
   std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
   std::cout << cache;
 
@@ -97,6 +98,31 @@ void test() {
   *h7 = 777;
   std::cout << "\n=== Expect: lru: [3, 6, 5, 7], in_use: [] ===\n";
   std::cout << cache;
+
+  // test export/import
+  bool success = cache.export_handle(h7);
+  assert(success);
+  std::cout << "\n=== Expect: lru: [3, 6, 5], in_use: [] ===\n";
+  std::cout << cache;
+
+  h6 = cache.lookup(6, 1006, true);
+  assert(h6);
+  std::cout << "\n=== Expect: lru: [3, 5], in_use: [6] ===\n";
+  std::cout << cache;
+  success = cache.export_handle(h6);
+  if (success) throw std::runtime_error("Export in-use handle is not denied!");
+
+  auto h8 = cache.insert(8, 1008);
+  *h8 = 888;
+  std::cout << "\n=== Expect: lru: [5, 8], in_use: [6] ===\n";
+  std::cout << cache;
+
+  auto h9 = cache.import_handle(9, 1009);
+  assert(h9);
+  *h9 = 999;
+  std::cout << "\n=== Expect: lru: [5, 8, 9], in_use: [6] ===\n";
+  std::cout << cache;
+
   std::cout << std::flush;
 }
 

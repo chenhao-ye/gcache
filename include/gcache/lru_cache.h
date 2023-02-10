@@ -2,11 +2,13 @@
  * Credit: this code is ported from Google LevelDB.
  */
 #pragma once
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 
 #include "handle.h"
 #include "handle_table.h"
@@ -19,6 +21,24 @@ class GhostCache;
 // Value_t should be trivially copyable
 template <typename Key_t, typename Value_t, typename Tag_t = EmptyTag>
 class LRUCache {
+  /**
+   * Note the values are initialized once and never destructed during the
+   * lifecycle of LRUCache; if a LRU replacement happens, a reused handle will
+   * carry the previous value instead of reinitialized.
+   * This design choice is not only for performance reasons but also associated
+   * with the usage pattern of LRU cache. In a typically use case, the key field
+   * is a block number and the value field is a pointer to the physical location
+   * of the cache. During the initialization, each node is assigned with a
+   * pointer; when a LRU replacement happens, the same physical page will be
+   * used to store the data of another page, in which case the key field will be
+   * the new block number, but the value field remains the same pointer. This is
+   * a fundamentally different from a key-value map, where the value's lifecycle
+   * is binded to the key. In addition, sometimes the user may want the
+   * LRU replacement not so transparent (e.g., the user maintains another data
+   * structures that must be updated once LRU happens). In this case, keeping
+   * the old value could be useful.
+   */
+
  public:
   using Node_t = LRUNode<Key_t, Value_t, Tag_t>;
   using Handle_t = LRUHandle<Node_t>;
@@ -62,19 +82,39 @@ class LRUCache {
   /****************************************************************************/
 
   // Init handle pool and table from externally instantiated ones but not owned
-  // them; the caller must free the pool and table after dtor
+  // them; the caller must free the pool and table after dtor.
   void init_from(Node_t* pool, HandleTable<Node_t>* table, size_t capacity);
 
   // Force this cache to return a handle (i.e. a cache slot) back to caller;
   // will try to return from free list first; if not available, preempt from
-  // lru_ instead; if still not available, return nullptr
+  // lru_ instead; if still not available, return nullptr.
   Handle_t preempt();
 
   // Assign a new handle to this LRUCache; will be put into free list (duel with
-  // `preempt`)
+  // `preempt`).
   void assign(Handle_t e);
 
   void try_refresh(Handle_t e, bool pin);
+
+  /**
+   * The normal opeartions (insert/lookup/release) will only cause a handle to
+   * flow among the lru list, the in_use list, and the free list.
+   * Only export will force a handle to jump out of circulation, and only import
+   * may put a handle back. When a handle is exported, its value is trashed
+   * (considered as garbage bits); this is semantically different from a handle
+   * in free list, where the value is long-lived. If the caller get a handle
+   * from `import_handle`, the value fields must be overwritten before any read.
+   */
+
+  // Erase the non-null handle from the lru list; return whether erasing
+  // succeeds (fail if not in lru). The erased handle will not be reused by
+  // `insert`, and the caller should save the value if necessary.
+  bool export_handle(Handle_t handle);
+
+  // Install a handle into the lru list. This action will not use free list or
+  // lru list but allocate additional space or reused space from exported
+  // handles. The caller should set the value immediately.
+  Handle_t import_handle(Key_t key, uint32_t hash);
 
  private:
   friend GhostCache;
@@ -114,6 +154,16 @@ class LRUCache {
   // Dummy head of free list.
   Node_t free_;
 
+  /* `exported_` and `extra_pool_` are only used by `export/install_handle`. */
+
+  // Dummy head of exported list.
+  // Entries here are exported, and all fields are just random garbage. This
+  // list is only maintained for memory efficiency purposes.
+  Node_t exported_;
+
+  // Pool for additionaly installed handles.
+  std::vector<Node_t*> extra_pool_;
+
  public:  // for debugging
   std::ostream& print(std::ostream& os, int indent = 0) const;
   friend std::ostream& operator<<(std::ostream& os, const LRUCache& c) {
@@ -129,6 +179,8 @@ inline LRUCache<Key_t, Value_t, Tag_t>::LRUCache()
   lru_.prev = &lru_;
   in_use_.next = &in_use_;
   in_use_.prev = &in_use_;
+  exported_.next = &exported_;
+  exported_.prev = &exported_;
   // free_ will be initialized when init() is called
 }
 
@@ -146,6 +198,7 @@ inline LRUCache<Key_t, Value_t, Tag_t>::~LRUCache() {
     delete[] pool_;
     delete table_;
   }
+  for (auto e : extra_pool_) delete e;
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
@@ -302,6 +355,38 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::try_refresh(Handle_t handle,
     ref(e);
   else if (e->refs == 1)
     lru_refresh(e);
+}
+
+template <typename Key_t, typename Value_t, typename Tag_t>
+inline bool LRUCache<Key_t, Value_t, Tag_t>::export_handle(Handle_t handle) {
+  Node_t* e = handle.node;
+  assert(!e);
+  if (e->refs != 1) return false;
+  list_remove(e);
+  list_append(&exported_, e);
+  [[maybe_unused]] Node_t* e_;
+  e_ = table_->remove(e->key, e->hash);
+  assert(e_ == e);
+  --capacity_;
+  return true;
+}
+
+template <typename Key_t, typename Value_t, typename Tag_t>
+inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
+LRUCache<Key_t, Value_t, Tag_t>::import_handle(Key_t key, uint32_t hash) {
+  Node_t* e;
+  if (exported_.next == &exported_) {
+    e = new Node_t;
+    extra_pool_.emplace_back(e);
+  } else {
+    e = exported_.next;
+    list_remove(e);
+  }
+  e->init(key, hash);
+  table_->insert(e);
+  list_append(&lru_, e);
+  ++capacity_;
+  return e;
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>

@@ -100,7 +100,7 @@ void test() {
   std::cout << cache;
 
   // test export/import
-  bool success = cache.export_handle(h7);
+  bool success = cache.export_node(h7);
   assert(success);
   std::cout << "\n=== Expect: lru: [3, 6, 5], in_use: [] ===\n";
   std::cout << cache;
@@ -109,7 +109,7 @@ void test() {
   assert(h6);
   std::cout << "\n=== Expect: lru: [3, 5], in_use: [6] ===\n";
   std::cout << cache;
-  success = cache.export_handle(h6);
+  success = cache.export_node(h6);
   if (success) throw std::runtime_error("Export in-use handle is not denied!");
 
   auto h8 = cache.insert(8, 1008);
@@ -117,7 +117,7 @@ void test() {
   std::cout << "\n=== Expect: lru: [5, 8], in_use: [6] ===\n";
   std::cout << cache;
 
-  auto h9 = cache.import_handle(9, 1009);
+  auto h9 = cache.import_node(9, 1009);
   assert(h9);
   *h9 = 999;
   std::cout << "\n=== Expect: lru: [5, 8, 9], in_use: [6] ===\n";

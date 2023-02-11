@@ -28,7 +28,7 @@ namespace gcache {
 // external reference.
 
 template <typename Node_t>
-class HandleTable;
+class NodeTable;
 template <typename Key_t, typename Value_t, typename Tag_t>
 class LRUCache;
 class GhostCache;
@@ -43,7 +43,7 @@ class LRUNode {
   LRUNode *prev;
   uint32_t refs;  // References, including cache reference, if present.
 
-  friend class HandleTable<LRUNode>;
+  friend class NodeTable<LRUNode>;
   friend class LRUCache<Key_t, Value_t, Tag_t>;
   friend class GhostCache;
 

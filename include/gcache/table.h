@@ -9,7 +9,7 @@
 #include <cstring>
 #include <iostream>
 
-#include "handle.h"
+#include "node.h"
 
 namespace gcache {
 
@@ -19,12 +19,12 @@ namespace gcache {
 // we have tested.  E.g., readrandom speeds up by ~5% over the g++
 // 4.4.3's builtin hashtable.
 template <typename Node_t>
-class HandleTable {
+class NodeTable {
   using Key_t = typename Node_t::key_type;
 
  public:
-  HandleTable() : length_(0), list_(nullptr) {}
-  ~HandleTable() { delete[] list_; }
+  NodeTable() : length_(0), list_(nullptr) {}
+  ~NodeTable() { delete[] list_; }
 
   void init(size_t size);  // size must be 2^n; must be called before any r/w
 
@@ -49,7 +49,7 @@ class HandleTable {
 };
 
 template <typename Node_t>
-inline void HandleTable<Node_t>::insert(Node_t* e) {
+inline void NodeTable<Node_t>::insert(Node_t* e) {
   // Caller must ensure e->key is not present in the table!
   assert(!lookup(e->key, e->hash));
   // Add to the head of this linked list
@@ -59,13 +59,13 @@ inline void HandleTable<Node_t>::insert(Node_t* e) {
 }
 
 template <typename Node_t>
-inline Node_t* HandleTable<Node_t>::lookup(Key_t key, uint32_t hash) {
+inline Node_t* NodeTable<Node_t>::lookup(Key_t key, uint32_t hash) {
   assert(length_ > 0);
   return *find_pointer(key, hash);
 }
 
 template <typename Node_t>
-inline Node_t* HandleTable<Node_t>::remove(Key_t key, uint32_t hash) {
+inline Node_t* NodeTable<Node_t>::remove(Key_t key, uint32_t hash) {
   assert(length_ > 0);
   Node_t** ptr = find_pointer(key, hash);
   Node_t* result = *ptr;
@@ -77,7 +77,7 @@ inline Node_t* HandleTable<Node_t>::remove(Key_t key, uint32_t hash) {
 // matches key/hash.  If there is no such cache entry, return a
 // pointer to the trailing slot in the corresponding linked list.
 template <typename Node_t>
-inline Node_t** HandleTable<Node_t>::find_pointer(Key_t key, uint32_t hash) {
+inline Node_t** NodeTable<Node_t>::find_pointer(Key_t key, uint32_t hash) {
   Node_t** ptr = &list_[hash & (length_ - 1)];
   while (*ptr != nullptr && ((*ptr)->hash != hash || key != (*ptr)->key)) {
     ptr = &(*ptr)->next_hash;
@@ -86,7 +86,7 @@ inline Node_t** HandleTable<Node_t>::find_pointer(Key_t key, uint32_t hash) {
 }
 
 template <typename Node_t>
-inline void HandleTable<Node_t>::init(size_t size) {
+inline void NodeTable<Node_t>::init(size_t size) {
   size = std::bit_ceil<size_t>(size);
   length_ = size;
   list_ = new Node_t*[length_];
@@ -94,9 +94,9 @@ inline void HandleTable<Node_t>::init(size_t size) {
 }
 
 template <typename Node_t>
-inline std::ostream& HandleTable<Node_t>::print(std::ostream& os,
-                                                int indent) const {
-  os << "HandleTable (length=" << length_ << ") {\n";
+inline std::ostream& NodeTable<Node_t>::print(std::ostream& os,
+                                              int indent) const {
+  os << "NodeTable (length=" << length_ << ") {\n";
   for (size_t i = 0; i < length_; ++i) {
     auto h = list_[i];
     if (!h) continue;

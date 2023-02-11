@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 #include "gcache/ghost_cache.h"
-#include "gcache/handle.h"
+#include "gcache/node.h"
 #include "util.h"
 
 using namespace gcache;

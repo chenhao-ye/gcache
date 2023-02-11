@@ -3,8 +3,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "gcache/handle.h"
 #include "gcache/lru_cache.h"
+#include "gcache/node.h"
 
 namespace gcache {
 
@@ -57,14 +57,14 @@ class SharedCache {
   // return; return number of handles relocated successfully
   size_t relocate(Tag_t src, Tag_t dst, size_t size);
 
-  // Similar to LRUCache export/import_handle
-  bool export_handle(Handle_t handle);
-  Handle_t import_handle(Tag_t tag, Key_t key, uint32_t hash);
+  // Similar to LRUCache export/import_node
+  bool export_node(Handle_t handle);
+  Handle_t import_node(Tag_t tag, Key_t key, uint32_t hash);
 
  private:
   Node_t* pool_;
   size_t total_capacity_;
-  HandleTable<Node_t> table_;
+  NodeTable<Node_t> table_;
 
   // Map each tenant's tag to its own cache; must be const after `init`
   std::unordered_map<Tag_t, LRUCache<Key_t, Value_t, Tag_t>> tenant_cache_map_;
@@ -176,17 +176,17 @@ inline size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
-inline bool SharedCache<Tag_t, Key_t, Value_t>::export_handle(Handle_t handle) {
+inline bool SharedCache<Tag_t, Key_t, Value_t>::export_node(Handle_t handle) {
   assert(tenant_cache_map_.contains(handle.node->tag));
-  return tenant_cache_map_[handle.node->tag].export_handle(handle);
+  return tenant_cache_map_[handle.node->tag].export_node(handle);
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>
 inline typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t
-SharedCache<Tag_t, Key_t, Value_t>::import_handle(Tag_t tag, Key_t key,
+SharedCache<Tag_t, Key_t, Value_t>::import_node(Tag_t tag, Key_t key,
                                                   uint32_t hash) {
   assert(tenant_cache_map_.contains(tag));
-  return tenant_cache_map_[tag].import_handle(key, hash);
+  return tenant_cache_map_[tag].import_node(key, hash);
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t>

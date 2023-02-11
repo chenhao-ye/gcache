@@ -10,9 +10,9 @@
 #include <limits>
 #include <vector>
 
-#include "gcache/handle.h"
-#include "gcache/handle_table.h"
 #include "gcache/lru_cache.h"
+#include "gcache/node.h"
+#include "gcache/table.h"
 
 namespace gcache {
 

@@ -20,7 +20,7 @@
 
 static OffsetType wl_type = OffsetType::ZIPF;
 static uint64_t num_blocks = 1024 * 1024 * 1024 / 4096;  // 1 GB
-static uint64_t num_ops = 10'000'000; // 10M
+static uint64_t num_ops = 10'000'000;                    // 10M
 static uint64_t preheat_num_ops = num_ops / 10;
 static double zipf_theta = 0.99;
 

@@ -18,10 +18,10 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(SOURCE_FILES
-	include/gcache/ghost_cache.h
-	include/gcache/handle.h
-	include/gcache/handle_table.h
+	include/gcache/node.h
+	include/gcache/table.h
 	include/gcache/lru_cache.h
+	include/gcache/ghost_cache.h
 	include/gcache/shared_cache.h)
 
 include_directories(include)

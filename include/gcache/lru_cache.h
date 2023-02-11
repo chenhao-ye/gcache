@@ -10,8 +10,8 @@
 #include <iostream>
 #include <vector>
 
-#include "handle.h"
-#include "handle_table.h"
+#include "node.h"
+#include "table.h"
 
 namespace gcache {
 
@@ -58,23 +58,23 @@ class LRUCache {
   template <typename Fn>
   void for_each(Fn&& fn);
 
-  // Set pin to be true to pin the returned Handle so it won't be recycled by
-  // LRU; a pinned handle must be unpinned later by calling release()
+  // Set pin to be true to pin the returned node so it won't be recycled by
+  // LRU; a pinned node must be unpinned later by calling release()
 
-  // Insert a handle into cache with given key and hash if not exists; if does,
+  // Insert a node into cache with given key and hash if not exists; if does,
   // return the existing one; if it is known for sure that the key must not
   // exist, set not_exist to true to skip a lookup
   Handle_t insert(Key_t key, uint32_t hash, bool pin = false,
                   bool hint_nonexist = false);
-  // Search for a handle; return nullptr if not exist
+  // Search for a node; return nullptr if not exist
   Handle_t lookup(Key_t key, uint32_t hash, bool pin = false);
-  // Release pinned handle returned by insert/lookup
+  // Release pinned node returned by insert/lookup
   void release(Handle_t handle);
-  // Pin a handle returned by insert/lookup
-  void pin(Handle_t handle);
-  // Similar to insert but 1) never pin and the targeted handle must be in LRU
-  // list, 2) return `successor`: the handle with the same order as the returned
-  // handle after LRU operations (nullptr if newly inserted).
+  // Pin a node returned by insert/lookup
+  void pin(Handle_t node);
+  // Similar to insert but 1) never pin and the targeted node must be in LRU
+  // list, 2) return `successor`: the node with the same order as the returned
+  // node after LRU operations (nullptr if newly inserted).
   Handle_t touch(Key_t key, uint32_t hash, Handle_t& successor);
 
   /****************************************************************************/
@@ -83,43 +83,43 @@ class LRUCache {
 
   // Init handle pool and table from externally instantiated ones but not owned
   // them; the caller must free the pool and table after dtor.
-  void init_from(Node_t* pool, HandleTable<Node_t>* table, size_t capacity);
+  void init_from(Node_t* pool, NodeTable<Node_t>* table, size_t capacity);
 
-  // Force this cache to return a handle (i.e. a cache slot) back to caller;
+  // Force this cache to return a node (i.e. a cache slot) back to caller;
   // will try to return from free list first; if not available, preempt from
   // lru_ instead; if still not available, return nullptr.
   Handle_t preempt();
 
-  // Assign a new handle to this LRUCache; will be put into free list (duel with
+  // Assign a new node to this LRUCache; will be put into free list (duel with
   // `preempt`).
   void assign(Handle_t e);
 
   void try_refresh(Handle_t e, bool pin);
 
   /**
-   * The normal opeartions (insert/lookup/release) will only cause a handle to
+   * The normal opeartions (insert/lookup/release) will only cause a node to
    * flow among the lru list, the in_use list, and the free list.
-   * Only export will force a handle to jump out of circulation, and only import
-   * may put a handle back. When a handle is exported, its value is trashed
-   * (considered as garbage bits); this is semantically different from a handle
-   * in free list, where the value is long-lived. If the caller get a handle
-   * from `import_handle`, the value fields must be overwritten before any read.
+   * Only export will force a node to jump out of circulation, and only import
+   * may put a node back. When a node is exported, its value is trashed
+   * (considered as garbage bits); this is semantically different from a node
+   * in free list, where the value is long-lived. If the caller get a node
+   * from `import_node`, the value fields must be overwritten before any read.
    */
 
   // Erase the non-null handle from the lru list; return whether erasing
   // succeeds (fail if not in lru). The erased handle will not be reused by
   // `insert`, and the caller should save the value if necessary.
-  bool export_handle(Handle_t handle);
+  bool export_node(Handle_t handle);
 
   // Install a handle into the lru list. This action will not use free list or
   // lru list but allocate additional space or reused space from exported
   // handles. The caller should set the value immediately.
-  Handle_t import_handle(Key_t key, uint32_t hash);
+  Handle_t import_node(Key_t key, uint32_t hash);
 
  private:
   friend GhostCache;
-  Node_t* alloc_handle();
-  void free_handle(Node_t* e);
+  Node_t* alloc_node();
+  void free_node(Node_t* e);
   void list_remove(Node_t* e);
   void list_append(Node_t* list, Node_t* e);
   void ref(Node_t* e);
@@ -140,7 +140,7 @@ class LRUCache {
   // Hash table to lookup
   // If user calls `init_from`, this field will just refer to the external one;
   // otherwise, managed by this class instance
-  HandleTable<Node_t>* table_;
+  NodeTable<Node_t>* table_;
 
   // Dummy head of LRU list.
   // lru.prev is the newest entry, lru.next is the oldest entry.
@@ -186,15 +186,19 @@ inline LRUCache<Key_t, Value_t, Tag_t>::LRUCache()
 
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline LRUCache<Key_t, Value_t, Tag_t>::~LRUCache() {
-  assert(in_use_.next == &in_use_);  // Error if caller has an unreleased handle
-  // if pool_ is nullptr, then this instance is initialized from `init_from` not
-  // `init`, which means it owns neither pool_ nor table_. In this case, all
-  // handles have been freed so must avoid accessing them
+  /* Error if caller has an unreleased node */
+  // assert(in_use_.next == &in_use_);
+
+  /**
+   * if `pool_` is nullptr, then this instance is initialized from `init_from`
+   * not `init`, which means it owns neither pool_ nor table_. In this case, all
+   * nodes have been freed so must avoid accessing them
+   */
+
   if (pool_) {
-    // if pool_ is
-    // Unnecessary for correctness, but kept to ease debugging
-    for (const Node_t* e = lru_.next; e != &lru_; e = e->next)
-      assert(e->refs == 1);  // Invariant of lru_ list.
+    /* Unnecessary for correctness, but kept to ease debugging */
+    // for (const Node_t* e = lru_.next; e != &lru_; e = e->next)
+    //   assert(e->refs == 1);  // Invariant of lru_ list.
     delete[] pool_;
     delete table_;
   }
@@ -216,7 +220,7 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::init(size_t capacity) {
     pool_[i].next = &pool_[i + 1];
     pool_[i + 1].prev = &pool_[i];
   }
-  table_ = new HandleTable<Node_t>();
+  table_ = new NodeTable<Node_t>();
   table_->init(capacity);
 }
 
@@ -237,8 +241,9 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::for_each(Fn&& fn) {
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::init_from(
-    Node_t* pool, HandleTable<Node_t>* table, size_t capacity) {
+inline void LRUCache<Key_t, Value_t, Tag_t>::init_from(Node_t* pool,
+                                                       NodeTable<Node_t>* table,
+                                                       size_t capacity) {
   assert(!capacity_ && !pool_ && !table_);
   assert(capacity);
   capacity_ = capacity;
@@ -271,7 +276,7 @@ LRUCache<Key_t, Value_t, Tag_t>::insert(Key_t key, uint32_t hash, bool pin,
     assert(!lookup(key, hash, pin).node);  // check if hint is correct
   }
 
-  e = alloc_handle();
+  e = alloc_node();
   if (!e) return nullptr;
   e->init(key, hash);
   table_->insert(e);
@@ -295,9 +300,10 @@ LRUCache<Key_t, Value_t, Tag_t>::lookup(Key_t key, uint32_t hash, bool pin) {
 
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline void LRUCache<Key_t, Value_t, Tag_t>::release(Handle_t handle) {
-  assert(handle.get_refs() > 1);
-  unref(handle.node);
-  assert(handle.get_refs() > 0);
+  Node_t* e = handle.node;
+  assert(e->refs > 1);
+  unref(e);
+  assert(e->refs > 0);
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
@@ -320,7 +326,7 @@ LRUCache<Key_t, Value_t, Tag_t>::touch(Key_t key, uint32_t hash,
   }
 
   successor = nullptr;
-  e = alloc_handle();
+  e = alloc_node();
   if (!e) return nullptr;
   e->init(key, hash);
   table_->insert(e);
@@ -334,16 +340,16 @@ inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
 LRUCache<Key_t, Value_t, Tag_t>::preempt() {
   // In fact, it is just like allocate a handle but instead of using it
   // immediately, return it out to caller (i.e. SharedCache)
-  // We keep this function independent from `alloc_handle` to make it
+  // We keep this function independent from `alloc_node` to make it
   // semantically clear
   --capacity_;
-  return alloc_handle();
+  return alloc_node();
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline void LRUCache<Key_t, Value_t, Tag_t>::assign(Handle_t e) {
   ++capacity_;
-  free_handle(e.node);
+  free_node(e.node);
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
@@ -358,7 +364,7 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::try_refresh(Handle_t handle,
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-inline bool LRUCache<Key_t, Value_t, Tag_t>::export_handle(Handle_t handle) {
+inline bool LRUCache<Key_t, Value_t, Tag_t>::export_node(Handle_t handle) {
   Node_t* e = handle.node;
   assert(e);
   if (e->refs != 1) return false;
@@ -373,7 +379,7 @@ inline bool LRUCache<Key_t, Value_t, Tag_t>::export_handle(Handle_t handle) {
 
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
-LRUCache<Key_t, Value_t, Tag_t>::import_handle(Key_t key, uint32_t hash) {
+LRUCache<Key_t, Value_t, Tag_t>::import_node(Key_t key, uint32_t hash) {
   Node_t* e;
   if (exported_.next == &exported_) {
     e = new Node_t;
@@ -391,7 +397,7 @@ LRUCache<Key_t, Value_t, Tag_t>::import_handle(Key_t key, uint32_t hash) {
 
 template <typename Key_t, typename Value_t, typename Tag_t>
 inline typename LRUCache<Key_t, Value_t, Tag_t>::Node_t*
-LRUCache<Key_t, Value_t, Tag_t>::alloc_handle() {
+LRUCache<Key_t, Value_t, Tag_t>::alloc_node() {
   if (free_.next != &free_) {  // Allocate from free list
     Node_t* e = free_.next;
     list_remove(e);
@@ -410,7 +416,7 @@ LRUCache<Key_t, Value_t, Tag_t>::alloc_handle() {
 }
 
 template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::free_handle(Node_t* e) {
+inline void LRUCache<Key_t, Value_t, Tag_t>::free_node(Node_t* e) {
   list_append(&free_, e);
 }
 
@@ -428,7 +434,7 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::unref(Node_t* e) {
   assert(e->refs > 0);
   e->refs--;
   if (e->refs == 0) {  // Deallocate.
-    free_handle(e);
+    free_node(e);
   } else if (e->refs == 1) {
     // No longer in use; move to lru_ list.
     list_remove(e);

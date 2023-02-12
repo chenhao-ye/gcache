@@ -19,7 +19,7 @@ class GhostCache;
 
 // Key_t should be lightweight that can be pass-by-value
 // Value_t should be trivially copyable
-template <typename Key_t, typename Value_t, typename Tag_t = EmptyTag>
+template <typename Key_t, typename Value_t>
 class LRUCache {
   /**
    * Note the values are initialized once and never destructed during the
@@ -40,8 +40,9 @@ class LRUCache {
    */
 
  public:
-  using Node_t = LRUNode<Key_t, Value_t, Tag_t>;
-  using Handle_t = LRUHandle<Node_t>;
+  using Node_t = LRUNode<Key_t, Value_t>;
+  using Handle_t = LRUHandle<Key_t, Value_t>;
+
   LRUCache();
   ~LRUCache();
   LRUCache(const LRUCache&) = delete;
@@ -83,7 +84,8 @@ class LRUCache {
 
   // Init handle pool and table from externally instantiated ones but not owned
   // them; the caller must free the pool and table after dtor.
-  void init_from(Node_t* pool, NodeTable<Node_t>* table, size_t capacity);
+  void init_from(Node_t* pool, NodeTable<Key_t, Value_t>* table,
+                 size_t capacity);
 
   // Force this cache to return a node (i.e. a cache slot) back to caller;
   // will try to return from free list first; if not available, preempt from
@@ -140,7 +142,7 @@ class LRUCache {
   // Hash table to lookup
   // If user calls `init_from`, this field will just refer to the external one;
   // otherwise, managed by this class instance
-  NodeTable<Node_t>* table_;
+  NodeTable<Key_t, Value_t>* table_;
 
   // Dummy head of LRU list.
   // lru.prev is the newest entry, lru.next is the oldest entry.
@@ -171,8 +173,8 @@ class LRUCache {
   }
 };
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline LRUCache<Key_t, Value_t, Tag_t>::LRUCache()
+template <typename Key_t, typename Value_t>
+inline LRUCache<Key_t, Value_t>::LRUCache()
     : capacity_(0), pool_(nullptr), table_(nullptr) {
   // Make empty circular linked lists.
   lru_.next = &lru_;
@@ -184,8 +186,8 @@ inline LRUCache<Key_t, Value_t, Tag_t>::LRUCache()
   // free_ will be initialized when init() is called
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline LRUCache<Key_t, Value_t, Tag_t>::~LRUCache() {
+template <typename Key_t, typename Value_t>
+inline LRUCache<Key_t, Value_t>::~LRUCache() {
   /* Error if caller has an unreleased node */
   // assert(in_use_.next == &in_use_);
 
@@ -205,8 +207,8 @@ inline LRUCache<Key_t, Value_t, Tag_t>::~LRUCache() {
   for (auto e : extra_pool_) delete e;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::init(size_t capacity) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::init(size_t capacity) {
   assert(!capacity_ && !pool_ && !table_);
   assert(capacity);
   capacity_ = capacity;
@@ -220,30 +222,29 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::init(size_t capacity) {
     pool_[i].next = &pool_[i + 1];
     pool_[i + 1].prev = &pool_[i];
   }
-  table_ = new NodeTable<Node_t>();
+  table_ = new NodeTable<Key_t, Value_t>();
   table_->init(capacity);
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
+template <typename Key_t, typename Value_t>
 template <typename Fn>
-inline void LRUCache<Key_t, Value_t, Tag_t>::init(size_t capacity, Fn&& fn) {
+inline void LRUCache<Key_t, Value_t>::init(size_t capacity, Fn&& fn) {
   init(capacity);
   for (size_t i = 0; i < capacity; ++i) {
     fn(&pool_[i]);
   }
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
+template <typename Key_t, typename Value_t>
 template <typename Fn>
-inline void LRUCache<Key_t, Value_t, Tag_t>::for_each(Fn&& fn) {
+inline void LRUCache<Key_t, Value_t>::for_each(Fn&& fn) {
   in_use_.for_each(fn);
   lru_.for_each(fn);
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::init_from(Node_t* pool,
-                                                       NodeTable<Node_t>* table,
-                                                       size_t capacity) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::init_from(
+    Node_t* pool, NodeTable<Key_t, Value_t>* table, size_t capacity) {
   assert(!capacity_ && !pool_ && !table_);
   assert(capacity);
   capacity_ = capacity;
@@ -259,10 +260,10 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::init_from(Node_t* pool,
   table_ = table;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
-LRUCache<Key_t, Value_t, Tag_t>::insert(Key_t key, uint32_t hash, bool pin,
-                                        bool hint_nonexist) {
+template <typename Key_t, typename Value_t>
+inline typename LRUCache<Key_t, Value_t>::Handle_t
+LRUCache<Key_t, Value_t>::insert(Key_t key, uint32_t hash, bool pin,
+                                 bool hint_nonexist) {
   // Disable support for capacity_ == 0; the user must set capacity first
   assert(capacity_ > 0);
 
@@ -290,31 +291,30 @@ LRUCache<Key_t, Value_t, Tag_t>::insert(Key_t key, uint32_t hash, bool pin,
   return e;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
-LRUCache<Key_t, Value_t, Tag_t>::lookup(Key_t key, uint32_t hash, bool pin) {
+template <typename Key_t, typename Value_t>
+inline typename LRUCache<Key_t, Value_t>::Handle_t
+LRUCache<Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
   Handle_t e = table_->lookup(key, hash);
   if (e) try_refresh(e, pin);
   return e;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::release(Handle_t handle) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::release(Handle_t handle) {
   Node_t* e = handle.node;
   assert(e->refs > 1);
   unref(e);
   assert(e->refs > 0);
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::pin(Handle_t handle) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::pin(Handle_t handle) {
   ref(handle.node);
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
-LRUCache<Key_t, Value_t, Tag_t>::touch(Key_t key, uint32_t hash,
-                                       Handle_t& successor) {
+template <typename Key_t, typename Value_t>
+inline typename LRUCache<Key_t, Value_t>::Handle_t
+LRUCache<Key_t, Value_t>::touch(Key_t key, uint32_t hash, Handle_t& successor) {
   // Disable support for capacity_ == 0; the user must set capacity first
   assert(capacity_ > 0);
 
@@ -335,9 +335,9 @@ LRUCache<Key_t, Value_t, Tag_t>::touch(Key_t key, uint32_t hash,
   return e;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
-LRUCache<Key_t, Value_t, Tag_t>::preempt() {
+template <typename Key_t, typename Value_t>
+inline typename LRUCache<Key_t, Value_t>::Handle_t
+LRUCache<Key_t, Value_t>::preempt() {
   // In fact, it is just like allocate a handle but instead of using it
   // immediately, return it out to caller (i.e. SharedCache)
   // We keep this function independent from `alloc_node` to make it
@@ -346,15 +346,14 @@ LRUCache<Key_t, Value_t, Tag_t>::preempt() {
   return alloc_node();
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::assign(Handle_t e) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::assign(Handle_t e) {
   ++capacity_;
   free_node(e.node);
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::try_refresh(Handle_t handle,
-                                                         bool pin) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::try_refresh(Handle_t handle, bool pin) {
   Node_t* e = handle.node;
   assert(e);
   if (pin)
@@ -363,8 +362,8 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::try_refresh(Handle_t handle,
     lru_refresh(e);
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline bool LRUCache<Key_t, Value_t, Tag_t>::export_node(Handle_t handle) {
+template <typename Key_t, typename Value_t>
+inline bool LRUCache<Key_t, Value_t>::export_node(Handle_t handle) {
   Node_t* e = handle.node;
   assert(e);
   if (e->refs != 1) return false;
@@ -377,9 +376,9 @@ inline bool LRUCache<Key_t, Value_t, Tag_t>::export_node(Handle_t handle) {
   return true;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline typename LRUCache<Key_t, Value_t, Tag_t>::Handle_t
-LRUCache<Key_t, Value_t, Tag_t>::import_node(Key_t key, uint32_t hash) {
+template <typename Key_t, typename Value_t>
+inline typename LRUCache<Key_t, Value_t>::Handle_t
+LRUCache<Key_t, Value_t>::import_node(Key_t key, uint32_t hash) {
   Node_t* e;
   if (exported_.next == &exported_) {
     e = new Node_t;
@@ -395,9 +394,9 @@ LRUCache<Key_t, Value_t, Tag_t>::import_node(Key_t key, uint32_t hash) {
   return e;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline typename LRUCache<Key_t, Value_t, Tag_t>::Node_t*
-LRUCache<Key_t, Value_t, Tag_t>::alloc_node() {
+template <typename Key_t, typename Value_t>
+inline typename LRUCache<Key_t, Value_t>::Node_t*
+LRUCache<Key_t, Value_t>::alloc_node() {
   if (free_.next != &free_) {  // Allocate from free list
     Node_t* e = free_.next;
     list_remove(e);
@@ -415,13 +414,13 @@ LRUCache<Key_t, Value_t, Tag_t>::alloc_node() {
   return e;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::free_node(Node_t* e) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::free_node(Node_t* e) {
   list_append(&free_, e);
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::ref(Node_t* e) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::ref(Node_t* e) {
   if (e->refs == 1) {  // If on lru_ list, move to in_use_ list.
     list_remove(e);
     list_append(&in_use_, e);
@@ -429,8 +428,8 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::ref(Node_t* e) {
   e->refs++;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::unref(Node_t* e) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::unref(Node_t* e) {
   assert(e->refs > 0);
   e->refs--;
   if (e->refs == 0) {  // Deallocate.
@@ -442,15 +441,14 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::unref(Node_t* e) {
   }
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::list_remove(Node_t* e) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::list_remove(Node_t* e) {
   e->next->prev = e->prev;
   e->prev->next = e->next;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline void LRUCache<Key_t, Value_t, Tag_t>::list_append(Node_t* list,
-                                                         Node_t* e) {
+template <typename Key_t, typename Value_t>
+inline void LRUCache<Key_t, Value_t>::list_append(Node_t* list, Node_t* e) {
   // Make "e" newest entry by inserting just before *list
   e->next = list;
   e->prev = list->prev;
@@ -458,9 +456,9 @@ inline void LRUCache<Key_t, Value_t, Tag_t>::list_append(Node_t* list,
   e->next->prev = e;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline typename LRUCache<Key_t, Value_t, Tag_t>::Node_t*
-LRUCache<Key_t, Value_t, Tag_t>::lru_refresh(Node_t* e) {
+template <typename Key_t, typename Value_t>
+inline typename LRUCache<Key_t, Value_t>::Node_t*
+LRUCache<Key_t, Value_t>::lru_refresh(Node_t* e) {
   assert(e != &lru_);
   assert(e->refs == 1);
   auto successor = e->next;
@@ -470,9 +468,9 @@ LRUCache<Key_t, Value_t, Tag_t>::lru_refresh(Node_t* e) {
   return successor;
 }
 
-template <typename Key_t, typename Value_t, typename Tag_t>
-inline std::ostream& LRUCache<Key_t, Value_t, Tag_t>::print(std::ostream& os,
-                                                            int indent) const {
+template <typename Key_t, typename Value_t>
+inline std::ostream& LRUCache<Key_t, Value_t>::print(std::ostream& os,
+                                                     int indent) const {
   os << "LRUCache (capacity=" << capacity_ << ") {\n";
   for (int i = 0; i < indent + 1; ++i) os << '\t';
   os << "lru:    [";

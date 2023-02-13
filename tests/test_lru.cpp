@@ -8,36 +8,44 @@
 
 using namespace gcache;
 
+struct hash1 {
+  uint32_t operator()(uint32_t x) const noexcept { return x + 1000; }
+};
+
+struct hash2 {
+  uint32_t operator()(uint32_t x) const noexcept { return x; }
+};
+
 void test() {
-  LRUCache<uint32_t, uint32_t> cache;
+  LRUCache<uint32_t, uint32_t, hash1> cache;
   cache.init(4);
 
-  auto h1 = cache.insert(1, 1001, true);
+  auto h1 = cache.insert(1, true);
   assert(h1);
   *h1 = 111;
-  auto h2 = cache.insert(2, 1002, true);
+  auto h2 = cache.insert(2, true);
   assert(h2);
   *h1 = 222;
-  auto h3 = cache.insert(3, 1003, true);
+  auto h3 = cache.insert(3, true);
   assert(h3);
   *h1 = 333;
-  auto h4 = cache.insert(4, 1004);
+  auto h4 = cache.insert(4);
   assert(h4);
   *h1 = 444;
   std::cout << "=== Expect: lru: [4], in_use: [1, 2, 3] ===\n";
   std::cout << cache;
 
-  h4 = cache.lookup(4, 1004, true);
+  h4 = cache.lookup(4, true);
   *h4 = 4444;
   std::cout << "=== Expect: lru: [], in_use: [1, 2, 3, 4] ===\n";
   std::cout << cache;
 
-  auto h5 = cache.insert(5, 1005, true);
+  auto h5 = cache.insert(5, true);
   if (h5 != nullptr)
     throw std::runtime_error("Overflow insertion is not denied!");
 
   cache.release(h3);
-  h5 = cache.insert(5, 1005, true);
+  h5 = cache.insert(5, true);
   assert(h5);
   *h5 = 555;
   std::cout << "\n=== Expect: in_use: [1, 2, 4, 5] ===\n";
@@ -49,32 +57,32 @@ void test() {
   std::cout << "\n=== Expect: lru: [5, 2, 4], in_use: [1] ===\n";
   std::cout << cache;
 
-  h3 = cache.insert(3, 1003, true);
+  h3 = cache.insert(3, true);
   assert(h3);
   *h3 = 3333;
-  h5 = cache.lookup(5, 1005, true);
+  h5 = cache.lookup(5, true);
   std::cout << "\n=== Expect: lru: [2, 4], in_use: [1, 3] ===\n";
   std::cout << cache;
   if (h5 != nullptr)
     throw std::runtime_error("Expected evicted handle remains in cache!");
 
-  h5 = cache.insert(5, 1005, true);
+  h5 = cache.insert(5, true);
   std::cout << "\n=== Expect: lru: [4], in_use: [1, 3, 5] ===\n";
   std::cout << cache;
 
-  auto h6 = cache.insert(6, 1006, true);
+  auto h6 = cache.insert(6, true);
   assert(h6);
   *h6 = 666;
   std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
   std::cout << cache;
 
-  auto h5_ = cache.insert(5, 1005, true);
+  auto h5_ = cache.insert(5, true);
   assert(h5_ == h5);
   *h5_ = 555;
   std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
   std::cout << cache;
 
-  auto h7 = cache.insert(7, 1007, true);
+  auto h7 = cache.insert(7, true);
   std::cout << "\n=== Expect: lru: [], in_use: [1, 3, 5, 6] ===\n";
   std::cout << cache;
   if (h7) throw std::runtime_error("Overflow handle is not denied!");
@@ -90,10 +98,10 @@ void test() {
   std::cout << "\n=== Expect: lru: [1, 3, 6, 5], in_use: [] ===\n";
   std::cout << cache;
 
-  h7 = cache.lookup(7, 1007);
+  h7 = cache.lookup(7);
   if (h7) throw std::runtime_error("Lookup nonexisting handle is not denied!");
 
-  h7 = cache.insert(7, 1007);
+  h7 = cache.insert(7);
   assert(h7);
   *h7 = 777;
   std::cout << "\n=== Expect: lru: [3, 6, 5, 7], in_use: [] ===\n";
@@ -105,19 +113,19 @@ void test() {
   std::cout << "\n=== Expect: lru: [3, 6, 5], in_use: [] ===\n";
   std::cout << cache;
 
-  h6 = cache.lookup(6, 1006, true);
+  h6 = cache.lookup(6, true);
   assert(h6);
   std::cout << "\n=== Expect: lru: [3, 5], in_use: [6] ===\n";
   std::cout << cache;
   success = cache.export_node(h6);
   if (success) throw std::runtime_error("Export in-use handle is not denied!");
 
-  auto h8 = cache.insert(8, 1008);
+  auto h8 = cache.insert(8);
   *h8 = 888;
   std::cout << "\n=== Expect: lru: [5, 8], in_use: [6] ===\n";
   std::cout << cache;
 
-  auto h9 = cache.import_node(9, 1009);
+  auto h9 = cache.import_node(9);
   assert(h9);
   *h9 = 999;
   std::cout << "\n=== Expect: lru: [5, 8, 9], in_use: [6] ===\n";
@@ -129,21 +137,20 @@ void test() {
 }
 
 void bench() {
-  LRUCache<uint32_t, uint32_t> cache;
+  LRUCache<uint32_t, uint32_t, hash2> cache;
   cache.init(256 * 1024);  // #blocks for 1GB working set
 
   // filling the cache
   auto ts0 = rdtsc();
-  for (int i = 0; i < 256 * 1024; ++i) cache.insert(i, i);
+  for (int i = 0; i < 256 * 1024; ++i) cache.insert(i);
   auto ts1 = rdtsc();
 
   // cache hit
-  for (int i = 0; i < 256 * 1024; ++i) cache.insert(i, i);
+  for (int i = 0; i < 256 * 1024; ++i) cache.insert(i);
   auto ts2 = rdtsc();
 
   // cache miss
-  for (int i = 0; i < 256 * 1024; ++i)
-    cache.insert(i + 256 * 1024, i + 256 * 1024);
+  for (int i = 0; i < 256 * 1024; ++i) cache.insert(i + 256 * 1024);
   auto ts3 = rdtsc();
 
   std::cout << "Fill: " << (ts1 - ts0) / (256 * 1024) << " cycles/op\n";

@@ -8,7 +8,7 @@
 
 namespace gcache {
 
-template <typename Tag_t, typename Key_t, typename Value_t>
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 class SharedCache;
 
 template <typename Tag_t, typename Value_t>
@@ -33,19 +33,10 @@ class TaggedHandle
   TaggedHandle& operator=(const TaggedHandle&) = default;
   TaggedHandle& operator=(TaggedHandle&&) noexcept = default;
 
-  // converted from other handle
-  TaggedHandle(BaseHandle<LRUNode<Key_t, TaggedValue_t>> handle)
-      : BaseHandle<Node_t>(handle) {}
-  TaggedHandle& operator=(
-      const BaseHandle<LRUNode<Key_t, TaggedValue_t>>& handle) {
-    BaseHandle<LRUNode<Key_t, TaggedValue_t>>::operator=(handle);
-    return *this;
-  }
-  TaggedHandle& operator=(
-      BaseHandle<LRUNode<Key_t, TaggedValue_t>>&& handle) noexcept {
-    BaseHandle<LRUNode<Key_t, TaggedValue_t>>::operator=(handle);
-    return *this;
-  }
+  // disallow directly converted from LRUHandle
+  TaggedHandle(LRUHandle<Key_t, TaggedValue_t>) = delete;
+  TaggedHandle& operator=(const LRUHandle<Key_t, TaggedValue_t>&) = delete;
+  TaggedHandle& operator=(LRUHandle<Key_t, TaggedValue_t>&&) = delete;
 
   // multiplexing: node->value is of type `TaggedValue`; to get the real value,
   // must further access .value
@@ -62,12 +53,14 @@ class TaggedHandle
 
   // only visible to SharedCache: converted into LRUHandle
   LRUHandle<Key_t, TaggedValue_t> untagged() { return node; }
-  friend class SharedCache<Tag_t, Key_t, Value_t>;
+
+  template <typename T, typename K, typename V, typename H>
+  friend class SharedCache;
 };
 
 // Each tenant should have a "tag" which uniquely identifies this tenant. Tag
 // should be a lightweight type to copy.
-template <typename Tag_t, typename Key_t, typename Value_t>
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 class SharedCache {
  private:
   using TaggedValue_t = TaggedValue<Tag_t, Value_t>;
@@ -98,13 +91,13 @@ class SharedCache {
 
   // Insert a handle into cache with given key and hash if not exists; if does,
   // return the existing one
-  Handle_t insert(Tag_t tag, Key_t key, uint32_t hash, bool pin = false);
+  Handle_t insert(Tag_t tag, Key_t key, bool pin = false);
   // Search for a handle; return nullptr if not exist; no tag required because
   // there is no insertion may happen
   // FIXME: However, this op will refresh LRU list, so a tenant A could
   // repeatedly access a cache slot previously accessed by B and keep this slot
   // in memory, even though B does not use it anymore
-  Handle_t lookup(Key_t key, uint32_t hash, bool pin = false);
+  Handle_t lookup(Key_t key, bool pin = false);
   // Release pinned handle returned by insert/lookup
   void release(Handle_t handle);
   // Pin a handle returned by insert/lookup
@@ -119,15 +112,18 @@ class SharedCache {
 
   // Similar to LRUCache export/import_node
   bool export_node(Handle_t handle);
-  Handle_t import_node(Tag_t tag, Key_t key, uint32_t hash);
+  Handle_t import_node(Tag_t tag, Key_t key);
 
  private:
+  Node_t* lookup_impl(Key_t key, uint32_t hash, bool pin);
+
   Node_t* pool_;
   size_t total_capacity_;
   NodeTable<Key_t, TaggedValue_t> table_;
 
   // Map each tenant's tag to its own cache; must be const after `init`
-  std::unordered_map<Tag_t, LRUCache<Key_t, TaggedValue_t>> tenant_cache_map_;
+  std::unordered_map<Tag_t, LRUCache<Key_t, TaggedValue_t, Hash>>
+      tenant_cache_map_;
 
  public:  // for debugging
   std::ostream& print(std::ostream& os, int indent = 0) const;
@@ -136,8 +132,8 @@ class SharedCache {
   }
 };
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-void SharedCache<Tag_t, Key_t, Value_t>::init(
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+void SharedCache<Tag_t, Key_t, Value_t, Hash>::init(
     const std::vector<std::pair<Tag_t, size_t>>& tenant_configs) {
   total_capacity_ = 0;
   size_t begin_idx = 0;
@@ -152,9 +148,9 @@ void SharedCache<Tag_t, Key_t, Value_t>::init(
   assert(begin_idx == total_capacity_);
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 template <typename Fn>
-inline void SharedCache<Tag_t, Key_t, Value_t>::init(
+inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::init(
     const std::vector<std::pair<Tag_t, size_t>>& tenant_configs, Fn&& fn) {
   init(tenant_configs);
   for (size_t i = 0; i < total_capacity_; ++i) {
@@ -162,65 +158,75 @@ inline void SharedCache<Tag_t, Key_t, Value_t>::init(
   }
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-size_t SharedCache<Tag_t, Key_t, Value_t>::capacity_of(Tag_t tag) {
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::capacity_of(Tag_t tag) {
   assert(tenant_cache_map_.contains(tag));
   return tenant_cache_map_[tag].capacity();
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 template <typename Fn>
-inline void SharedCache<Tag_t, Key_t, Value_t>::for_each(Fn&& fn) {
+inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::for_each(Fn&& fn) {
   for (auto& [tag, cache] : tenant_cache_map_) {
     cache.for_each(fn);
   }
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-inline typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t
-SharedCache<Tag_t, Key_t, Value_t>::insert(Tag_t tag, Key_t key, uint32_t hash,
-                                           bool pin) {
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t
+SharedCache<Tag_t, Key_t, Value_t, Hash>::insert(Tag_t tag, Key_t key,
+                                                 bool pin) {
+  uint32_t hash = Hash{}(key);
   assert(tenant_cache_map_.contains(tag));
-  Handle_t e = lookup(key, hash, pin);
+  Node_t* e = lookup_impl(key, hash, pin);
   if (e) return e;
 
   // The key does not exist in the cache, perform insertion
-  e = tenant_cache_map_[tag].insert(key, hash, pin, /*not_exist*/ true);
+  e = tenant_cache_map_[tag].insert_impl(key, hash, pin, /*not_exist*/ true);
   if (!e) return nullptr;
-  e.set_tag(tag);
-  return e;
+  Handle_t h(e);
+  h.set_tag(tag);
+  return h;
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-inline typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t
-SharedCache<Tag_t, Key_t, Value_t>::lookup(Key_t key, uint32_t hash, bool pin) {
-  Handle_t e = table_.lookup(key, hash);
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t
+SharedCache<Tag_t, Key_t, Value_t, Hash>::lookup(Key_t key, bool pin) {
+  return lookup_impl(key, Hash{}(key), pin);
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Node_t*
+SharedCache<Tag_t, Key_t, Value_t, Hash>::lookup_impl(Key_t key, uint32_t hash,
+                                                      bool pin) {
+  Node_t* e = table_.lookup(key, hash);
   if (!e) return nullptr;
 
-  Tag_t tag = e.get_tag();  // e->value is of type `TaggedValue`
+  Tag_t tag = Handle_t(e).get_tag();
   assert(tenant_cache_map_.contains(tag));
-  tenant_cache_map_[tag].try_refresh(e.untagged(), pin);
+  tenant_cache_map_[tag].lookup_refresh(e, pin);
   return e;
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-inline void SharedCache<Tag_t, Key_t, Value_t>::release(Handle_t handle) {
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::release(Handle_t handle) {
   Tag_t tag = handle.get_tag();
   assert(tenant_cache_map_.contains(tag));
   tenant_cache_map_[tag].release(handle.untagged());
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-inline void SharedCache<Tag_t, Key_t, Value_t>::pin(
-    typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t handle) {
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::pin(
+    typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t handle) {
   Tag_t tag = handle.get_tag();
   assert(tenant_cache_map_.contains(tag));
   tenant_cache_map_[tag].pin(handle);
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-inline size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
-                                                           size_t size) {
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::relocate(Tag_t src,
+                                                                 Tag_t dst,
+                                                                 size_t size) {
   assert(tenant_cache_map_.contains(src));
   assert(tenant_cache_map_.contains(dst));
 
@@ -235,22 +241,22 @@ inline size_t SharedCache<Tag_t, Key_t, Value_t>::relocate(Tag_t src, Tag_t dst,
   return n;
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-inline bool SharedCache<Tag_t, Key_t, Value_t>::export_node(Handle_t handle) {
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline bool SharedCache<Tag_t, Key_t, Value_t, Hash>::export_node(
+    Handle_t handle) {
   assert(tenant_cache_map_.contains(handle.get_tag()));
   return tenant_cache_map_[handle.get_tag()].export_node(handle.untagged());
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-inline typename SharedCache<Tag_t, Key_t, Value_t>::Handle_t
-SharedCache<Tag_t, Key_t, Value_t>::import_node(Tag_t tag, Key_t key,
-                                                uint32_t hash) {
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t
+SharedCache<Tag_t, Key_t, Value_t, Hash>::import_node(Tag_t tag, Key_t key) {
   assert(tenant_cache_map_.contains(tag));
-  return tenant_cache_map_[tag].import_node(key, hash);
+  return tenant_cache_map_[tag].import_node_impl(key);
 }
 
-template <typename Tag_t, typename Key_t, typename Value_t>
-inline std::ostream& SharedCache<Tag_t, Key_t, Value_t>::print(
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline std::ostream& SharedCache<Tag_t, Key_t, Value_t, Hash>::print(
     std::ostream& os, int indent) const {
   os << "Tenant Cache Map {" << std::endl;
   for (auto& [tag, cache] : tenant_cache_map_) {

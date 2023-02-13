@@ -1,7 +1,5 @@
 #pragma once
 
-#include <nmmintrin.h>  // for _mm_crc32_u32 instruction
-
 #include <bit>
 #include <cassert>
 #include <cstdint>
@@ -10,43 +8,12 @@
 #include <limits>
 #include <vector>
 
+#include "gcache/hash.h"
 #include "gcache/lru_cache.h"
 #include "gcache/node.h"
 #include "gcache/table.h"
 
 namespace gcache {
-
-/**
- * Here we tested on several implementation of hash. The exposed one is defined
- * as a macro `gcache_hash()`.
- */
-
-// From XXHash:
-// https://github.com/Cyan4973/xxHash/blob/release/xxhash.h#L1968
-[[maybe_unused]] static inline uint32_t xxhash_u32(uint32_t x) {
-  x ^= x >> 15;
-  x *= 0x85EBCA77U;
-  x ^= x >> 13;
-  x *= 0xC2B2AE3DU;
-  x ^= x >> 16;
-  return x;
-}
-
-// From MurmurHash:
-// https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp#L68
-[[maybe_unused]] static inline uint32_t murmurhash_u32(uint32_t x) {
-  x ^= x >> 16;
-  x *= 0x85ebca6b;
-  x ^= x >> 13;
-  x *= 0xc2b2ae35;
-  x ^= x >> 16;
-  return x;
-}
-
-// From CRC
-#define crc_u32(x) _mm_crc32_u32(/*seed*/ 0x537, x)
-
-#define gcache_hash(x) crc_u32(x)
 
 struct CacheStat {
   uint64_t hit_cnt;
@@ -102,10 +69,10 @@ class GhostCache {
   // Key is page_id/block number
   // Value is "size_idx", which means the handle will in cache if the cache size
   // is ((size_idx + 1) * tick) but not if the cache size is (size_idx * tick).
-  LRUCache<uint32_t, uint32_t> cache;
+  LRUCache<uint32_t, uint32_t, ghash> cache;
 
-  using Handle_t = LRUCache<uint32_t, uint32_t>::Handle_t;
-  using Node_t = LRUCache<uint32_t, uint32_t>::Node_t;
+  using Handle_t = LRUCache<uint32_t, uint32_t, ghash>::Handle_t;
+  using Node_t = LRUCache<uint32_t, uint32_t, ghash>::Node_t;
   // these must be placed after num_ticks to ensure a correct ctor order
   std::vector<Node_t*> size_boundaries;
   std::vector<CacheStat> caches_stat;
@@ -127,7 +94,7 @@ class GhostCache {
     assert(min_size + (num_ticks - 1) * tick == max_size);
     cache.init(max_size);
   }
-  void access(uint32_t page_id) { access_impl(page_id, gcache_hash(page_id)); }
+  void access(uint32_t page_id) { access_impl(page_id, ghash{}(page_id)); }
 
   uint32_t get_tick() const { return tick; }
   uint32_t get_min_size() const { return min_size; }
@@ -175,7 +142,7 @@ class SampleGhostCache : public GhostCache {
 
   // Only update ghost cache if the first few bits of hash is all zero
   void access(uint32_t page_id) {
-    uint32_t hash = gcache_hash(page_id);
+    uint32_t hash = ghash{}(page_id);
     if ((hash >> (32 - SampleShift)) == 0) access_impl(page_id, hash);
   }
 
@@ -204,7 +171,7 @@ class SampleGhostCache : public GhostCache {
 inline void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
   uint32_t size_idx;
   Handle_t s;  // successor
-  Handle_t h = cache.touch(page_id, hash, s);
+  Handle_t h = cache.refresh(page_id, hash, s);
   assert(h);  // Since there is no handle in use, allocation must never fail.
 
   /**

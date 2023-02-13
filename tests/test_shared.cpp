@@ -78,7 +78,7 @@ void test1() {
   std::cout << shared_cache << std::endl;
 
   // test export/import
-  bool success = shared_cache.export_node(h);
+  [[maybe_unused]] bool success = shared_cache.export_node(h);
   assert(success);
   std::cout << "Expect: { 564: [6, 7, 8], 537: [2] }" << std::endl;
   std::cout << shared_cache << std::endl;

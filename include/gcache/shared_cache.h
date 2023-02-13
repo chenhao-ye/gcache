@@ -204,7 +204,7 @@ SharedCache<Tag_t, Key_t, Value_t, Hash>::lookup_impl(Key_t key, uint32_t hash,
 
   Tag_t tag = Handle_t(e).get_tag();
   assert(tenant_cache_map_.contains(tag));
-  tenant_cache_map_[tag].try_refresh(e, pin);
+  tenant_cache_map_[tag].lookup_refresh(e, pin);
   return e;
 }
 

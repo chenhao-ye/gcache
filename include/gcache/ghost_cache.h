@@ -171,7 +171,7 @@ class SampleGhostCache : public GhostCache {
 inline void GhostCache::access_impl(uint32_t page_id, uint32_t hash) {
   uint32_t size_idx;
   Handle_t s;  // successor
-  Handle_t h = cache.touch_impl(page_id, hash, s);
+  Handle_t h = cache.refresh(page_id, hash, s);
   assert(h);  // Since there is no handle in use, allocation must never fail.
 
   /**

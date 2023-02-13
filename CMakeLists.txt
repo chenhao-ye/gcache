@@ -18,6 +18,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(SOURCE_FILES
+	include/gcache/hash.h
 	include/gcache/node.h
 	include/gcache/table.h
 	include/gcache/lru_cache.h

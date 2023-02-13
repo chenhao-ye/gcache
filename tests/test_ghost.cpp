@@ -93,14 +93,14 @@ void bench1() {
   for (uint32_t i = 0; i < bench_size / 8; ++i) {
     // manually flatten the loop, becaues we cannot turn on compiler
     // optimization which will remove the whole loop since it produces nothing.
-    gcache_hash(i * 8);
-    gcache_hash(i * 8 + 1);
-    gcache_hash(i * 8 + 2);
-    gcache_hash(i * 8 + 3);
-    gcache_hash(i * 8 + 4);
-    gcache_hash(i * 8 + 5);
-    gcache_hash(i * 8 + 6);
-    gcache_hash(i * 8 + 7);
+    gcache::ghash{}(i * 8);
+    gcache::ghash{}(i * 8 + 1);
+    gcache::ghash{}(i * 8 + 2);
+    gcache::ghash{}(i * 8 + 3);
+    gcache::ghash{}(i * 8 + 4);
+    gcache::ghash{}(i * 8 + 5);
+    gcache::ghash{}(i * 8 + 6);
+    gcache::ghash{}(i * 8 + 7);
   }
   auto ts4 = rdtsc();
 

@@ -6,14 +6,15 @@ from plot_util import *
 
 results_dir = "results"
 
+
 def load_hit_rate_data(name: str):
     ghost_df = pd.read_csv(f"{results_dir}/{name}/hit_rate_ghost.csv",
                            na_values="nan",
                            skipinitialspace=True)
-    sample_df = pd.read_csv(f"{results_dir}/{name}/hit_rate_sample.csv",
-                            na_values="nan",
-                            skipinitialspace=True)
-    return ghost_df, sample_df
+    sampled_df = pd.read_csv(f"{results_dir}/{name}/hit_rate_sampled.csv",
+                             na_values="nan",
+                             skipinitialspace=True)
+    return ghost_df, sampled_df
 
 
 def get_motiv(df: pd.DataFrame) -> Tuple[List[float], List[float]]:

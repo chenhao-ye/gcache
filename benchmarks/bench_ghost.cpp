@@ -31,7 +31,7 @@ static uint32_t cache_max = num_blocks;
 static std::filesystem::path result_dir = ".";
 
 static bool run_ghost = true;
-static bool run_sample = true;
+static bool run_sampled = true;
 
 void parse_args(int argc, char* argv[]) {
   char junk;
@@ -75,7 +75,7 @@ void parse_args(int argc, char* argv[]) {
     } else if (strcmp(argv[i], "--no_ghost") == 0) {
       run_ghost = false;
     } else if (strcmp(argv[i], "--no_sampled") == 0) {
-      run_sample = false;
+      run_sampled = false;
     } else {
       std::cerr << "Invalid argument: " << argv[i] << std::endl;
       exit(1);
@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
   uint64_t offset_checksum1 = 0, offset_checksum2 = 0, offset_checksum3 = 0;
 
   gcache::GhostCache ghost_cache(cache_tick, cache_min, cache_max);
-  gcache::SampleGhostCache<SAMPLE_SHIFT> sample_ghost_cache(
+  gcache::SampledGhostCache<SAMPLE_SHIFT> sampled_ghost_cache(
       cache_tick, cache_min, cache_max);
 
   // preheat: run a subset of stream to populate the cache
@@ -141,11 +141,11 @@ int main(int argc, char* argv[]) {
   auto preheat_begin_ts = std::chrono::high_resolution_clock::now();
   for (auto off : prehead_offsets) {
     if (run_ghost) ghost_cache.access(off);
-    if (run_sample) sample_ghost_cache.access(off);
+    if (run_sampled) sampled_ghost_cache.access(off);
   }
   auto preheat_end_ts = std::chrono::high_resolution_clock::now();
   ghost_cache.reset_stat();
-  sample_ghost_cache.reset_stat();
+  sampled_ghost_cache.reset_stat();
   // for human's reference only, not used for any data processing purposes
   std::cout << "Preheat completes in "
             << std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -170,15 +170,15 @@ int main(int argc, char* argv[]) {
   }
 
   auto t2 = std::chrono::high_resolution_clock::now();
-  if (run_sample) {
+  if (run_sampled) {
     for (auto off : offsets3) {
       offset_checksum3 ^= off;
-      sample_ghost_cache.access(off);
+      sampled_ghost_cache.access(off);
     }
   }
   auto t3 = std::chrono::high_resolution_clock::now();
 
-  uint64_t t_base = 0, t_ghost = 0, t_sample = 0;
+  uint64_t t_base = 0, t_ghost = 0, t_sampled = 0;
   double ghost_overhead = 0, sampled_overhead = 0;
   t_base =
       std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
@@ -187,18 +187,18 @@ int main(int argc, char* argv[]) {
         std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
     ghost_overhead = double(t_ghost - t_base) / num_ops;
   }
-  if (run_sample) {
-    t_sample =
+  if (run_sampled) {
+    t_sampled =
         std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
-    sampled_overhead = double(t_sample - t_base) / num_ops;
+    sampled_overhead = double(t_sampled - t_base) / num_ops;
   }
 
   std::cout << "Baseline:            " << t_base << " us\n";
   std::cout << "Ghost Cache:         " << t_ghost << " us\n";
-  std::cout << "Sampled Ghost Cache: " << t_sample << " us\n";
+  std::cout << "Sampled Ghost Cache: " << t_sampled << " us\n";
   std::cout << "Ghost Overhead:      " << ghost_overhead << " us/op\n";
   std::cout << "Sampled Overhead:    " << sampled_overhead << " us/op\n";
-  ofs_perf << ',' << t_base << ',' << t_ghost << ',' << t_sample << ','
+  ofs_perf << ',' << t_base << ',' << t_ghost << ',' << t_sampled << ','
            << ghost_overhead << ',' << sampled_overhead;
 
   double avg_err = 0, max_err = 0;
@@ -214,22 +214,22 @@ int main(int argc, char* argv[]) {
       ofs_ghost << i << ',' << ghost_cache.get_hit_rate(i) << '\n';
   }
 
-  if (run_sample) {
+  if (run_sampled) {
     if (offset_checksum2 != offset_checksum3)
       std::cerr << "WARNING: offset checksums mismatch; "
                    "random generator may not be deterministic!\n";
 
-    std::ofstream ofs_sample(result_dir / "hit_rate_sample.csv");
-    ofs_sample << "num_blocks,hit_rate\n";
+    std::ofstream ofs_sampled(result_dir / "hit_rate_sampled.csv");
+    ofs_sampled << "num_blocks,hit_rate\n";
     for (size_t i = cache_min; i <= cache_max; i += cache_tick)
-      ofs_sample << i << ',' << sample_ghost_cache.get_hit_rate(i) << '\n';
+      ofs_sampled << i << ',' << sampled_ghost_cache.get_hit_rate(i) << '\n';
   }
 
-  if (run_ghost && run_sample) {
+  if (run_ghost && run_sampled) {
     std::vector<double> hit_rate_diff;  // dump the ghost cache status
     for (size_t i = cache_min; i <= cache_max; i += cache_tick) {
       double hr1 = ghost_cache.get_hit_rate(i);
-      double hr2 = sample_ghost_cache.get_hit_rate(i);
+      double hr2 = sampled_ghost_cache.get_hit_rate(i);
       hit_rate_diff.emplace_back(std::abs(hr1 - hr2));
     }
     // mean absolute error (MAE)

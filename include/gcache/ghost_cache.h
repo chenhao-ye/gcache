@@ -125,9 +125,9 @@ class GhostCache {
 
 // only sample 1/32 (~3.125%)
 template <uint32_t SampleShift = 5>
-class SampleGhostCache : public GhostCache {
+class SampledGhostCache : public GhostCache {
  public:
-  SampleGhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
+  SampledGhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
       : GhostCache(tick >> SampleShift, min_size >> SampleShift,
                    max_size >> SampleShift) {
     assert(tick % (1 << SampleShift) == 0);

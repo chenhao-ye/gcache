@@ -14,7 +14,7 @@ constexpr const uint32_t num_ops = 32 * 1024 * 1024;
 constexpr const uint32_t bench_size = 256 * 1024;             // 1 GB cache
 constexpr const uint32_t large_bench_size = 2 * 1024 * 1024;  // 8 GB cache
 
-constexpr const uint32_t sample_rate = 5;
+constexpr const uint32_t sample_shift = 5;
 
 void test1() {
   GhostCache ghost_cache(1, 3, 6);
@@ -113,21 +113,21 @@ void bench1() {
 }
 
 void bench2() {
-  SampleGhostCache<sample_rate> sample_ghost_cache(bench_size / 32,
-                                                   bench_size / 32, bench_size);
+  SampledGhostCache<sample_shift> sampled_ghost_cache(
+      bench_size / 32, bench_size / 32, bench_size);
 
   // filling the cache
   auto ts0 = rdtsc();
-  for (uint32_t i = 0; i < bench_size; ++i) sample_ghost_cache.access(i);
+  for (uint32_t i = 0; i < bench_size; ++i) sampled_ghost_cache.access(i);
   auto ts1 = rdtsc();
 
   // cache hit
-  for (uint32_t i = 0; i < bench_size; ++i) sample_ghost_cache.access(i);
+  for (uint32_t i = 0; i < bench_size; ++i) sampled_ghost_cache.access(i);
   auto ts2 = rdtsc();
 
   // cache miss
   for (uint32_t i = 0; i < bench_size; ++i)
-    sample_ghost_cache.access(i + bench_size);
+    sampled_ghost_cache.access(i + bench_size);
   auto ts3 = rdtsc();
 
   std::cout << "=== Bench 2 ===\n";
@@ -139,19 +139,19 @@ void bench2() {
 
 void bench3() {
   GhostCache ghost_cache(bench_size / 32, bench_size / 32, bench_size);
-  SampleGhostCache<sample_rate> sample_ghost_cache(bench_size / 32,
-                                                   bench_size / 32, bench_size);
+  SampledGhostCache<sample_shift> sampled_ghost_cache(
+      bench_size / 32, bench_size / 32, bench_size);
 
   // filling the cache
   std::vector<uint32_t> reqs;
   // working set is 1.2x of max cache size
   for (uint32_t i = 0; i < bench_size; ++i) {
     ghost_cache.access(i);
-    sample_ghost_cache.access(i);
+    sampled_ghost_cache.access(i);
     reqs.emplace_back(i);
   }
   ghost_cache.reset_stat();
-  sample_ghost_cache.reset_stat();
+  sampled_ghost_cache.reset_stat();
   std::random_shuffle(reqs.begin(), reqs.end());
 
   uint64_t elapse_g = 0;
@@ -166,7 +166,7 @@ void bench3() {
 
   ts0 = rdtsc();
   for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
-    for (auto j : reqs) sample_ghost_cache.access(j);
+    for (auto j : reqs) sampled_ghost_cache.access(j);
     elapse_s += rdtsc() - ts0;
     std::random_shuffle(reqs.begin(), reqs.end());
     ts0 = rdtsc();
@@ -184,7 +184,7 @@ void bench3() {
     std::cout << std::setw(7) << s / 1024 << "K ";
     ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';
-    sample_ghost_cache.get_stat(s).print(std::cout, 8);
+    sampled_ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << '\n';
   }
   std::cout
@@ -195,18 +195,18 @@ void bench3() {
 void bench4() {
   GhostCache ghost_cache(large_bench_size / 32, large_bench_size / 32,
                          large_bench_size);
-  SampleGhostCache<sample_rate> sample_ghost_cache(
+  SampledGhostCache<sample_shift> sampled_ghost_cache(
       large_bench_size / 32, large_bench_size / 32, large_bench_size);
 
   // filling the cache
   std::vector<uint32_t> reqs;
   for (uint32_t i = 0; i < large_bench_size; ++i) {
     ghost_cache.access(i);
-    sample_ghost_cache.access(i);
+    sampled_ghost_cache.access(i);
     reqs.emplace_back(i);
   }
   ghost_cache.reset_stat();
-  sample_ghost_cache.reset_stat();
+  sampled_ghost_cache.reset_stat();
   std::random_shuffle(reqs.begin(), reqs.end());
 
   uint64_t elapse_g = 0;
@@ -221,7 +221,7 @@ void bench4() {
 
   ts0 = rdtsc();
   for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
-    for (auto j : reqs) sample_ghost_cache.access(j);
+    for (auto j : reqs) sampled_ghost_cache.access(j);
     elapse_s += rdtsc() - ts0;
     std::random_shuffle(reqs.begin(), reqs.end());
     ts0 = rdtsc();
@@ -240,7 +240,7 @@ void bench4() {
     std::cout << std::setw(7) << s / 1024 << "K ";
     ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';
-    sample_ghost_cache.get_stat(s).print(std::cout, 8);
+    sampled_ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << '\n';
   }
   std::cout
@@ -251,19 +251,19 @@ void bench4() {
 void bench5() {
   GhostCache ghost_cache(large_bench_size / 32, large_bench_size / 32,
                          large_bench_size);
-  SampleGhostCache<sample_rate> sample_ghost_cache(
+  SampledGhostCache<sample_shift> sampled_ghost_cache(
       large_bench_size / 32, large_bench_size / 32, large_bench_size);
 
   // filling the cache
   std::vector<uint32_t> reqs;
   for (uint32_t i = 0; i < large_bench_size; ++i) {
     ghost_cache.access(i);
-    sample_ghost_cache.access(i);
+    sampled_ghost_cache.access(i);
   }
   for (uint32_t i = 0; i < num_ops; ++i)
     reqs.emplace_back(rand() % large_bench_size);
   ghost_cache.reset_stat();
-  sample_ghost_cache.reset_stat();
+  sampled_ghost_cache.reset_stat();
   std::random_shuffle(reqs.begin(), reqs.end());
 
   uint64_t ts0;
@@ -272,7 +272,7 @@ void bench5() {
   uint64_t elapse_g = rdtsc() - ts0;
 
   ts0 = rdtsc();
-  for (auto i : reqs) sample_ghost_cache.access(i);
+  for (auto i : reqs) sampled_ghost_cache.access(i);
   uint64_t elapse_s = rdtsc() - ts0;
 
   std::cout << "=== Bench 5 ===\n";
@@ -288,7 +288,7 @@ void bench5() {
     std::cout << std::setw(7) << s / 1024 << "K ";
     ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << ' ';
-    sample_ghost_cache.get_stat(s).print(std::cout, 8);
+    sampled_ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << '\n';
   }
   std::cout

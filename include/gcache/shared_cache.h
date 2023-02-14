@@ -220,7 +220,7 @@ inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::pin(
     typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t handle) {
   Tag_t tag = handle.get_tag();
   assert(tenant_cache_map_.contains(tag));
-  tenant_cache_map_[tag].pin(handle);
+  tenant_cache_map_[tag].pin(handle.untagged());
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>

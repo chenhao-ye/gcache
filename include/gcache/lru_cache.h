@@ -26,7 +26,7 @@ class LRUCache {
   /**
    * Note the values are initialized once and never destructed during the
    * lifecycle of LRUCache; if a LRU replacement happens, a reused handle will
-   * carry the previous value instead of reinitialized.
+   * carry the previous value instead of the reinitialized.
    * This design choice is not only for performance reasons but also associated
    * with the usage pattern of LRU cache. In a typically use case, the key field
    * is a block number and the value field is a pointer to the physical location
@@ -35,10 +35,7 @@ class LRUCache {
    * used to store the data of another page, in which case the key field will be
    * the new block number, but the value field remains the same pointer. This is
    * a fundamentally different from a key-value map, where the value's lifecycle
-   * is binded to the key. In addition, sometimes the user may want the
-   * LRU replacement not so transparent (e.g., the user maintains another data
-   * structures that must be updated once LRU happens). In this case, keeping
-   * the old value could be useful.
+   * is binded to the key.
    */
 
  public:
@@ -55,24 +52,24 @@ class LRUCache {
   template <typename Fn>
   void init(size_t capacity, Fn&& fn);
 
-  size_t capacity() { return capacity_; }
+  size_t capacity() const { return capacity_; }
 
   // For each item in the cache, call fn(key, handle)
   template <typename Fn>
   void for_each(Fn&& fn);
 
   // Set pin to be true to pin the returned node so it won't be recycled by
-  // LRU; a pinned node must be unpinned later by calling release()
+  // LRU; a pinned node must be unpinned later by calling release().
 
   // Insert a node into cache with given key and hash if not exists; if does,
   // return the existing one; if it is known for sure that the key must not
-  // exist, set not_exist to true to skip a lookup
+  // exist, set `hint_nonexist` to true to skip a lookup.
   Handle_t insert(Key_t key, bool pin = false, bool hint_nonexist = false);
-  // Search for a node; return nullptr if not exist
+  // Search for a node; return nullptr if not exist. This op will refresh LRU.
   Handle_t lookup(Key_t key, bool pin = false);
-  // Release pinned node returned by insert/lookup
+  // Release pinned node returned by insert/lookup.
   void release(Handle_t handle);
-  // Pin a node returned by insert/lookup
+  // Pin a node returned by insert/lookup.
   void pin(Handle_t handle);
 
   /**
@@ -114,10 +111,6 @@ class LRUCache {
   // `preempt`).
   void assign(Handle_t handle);
 
-  // Helper function for lookup: 1) pin the node if asked; 2) refresh LRU if in
-  // the LRU list
-  void lookup_refresh(Node_t* node, bool pin);
-
   /****************************************************************************/
   /* Below are intrusive functions that should only be called by GhostCache   */
   /****************************************************************************/
@@ -132,6 +125,9 @@ class LRUCache {
   Node_t* insert_impl(Key_t key, uint32_t hash, bool pin, bool hint_nonexist);
   Node_t* lookup_impl(Key_t key, uint32_t hash, bool pin);
   Node_t* import_node_impl(Key_t key);
+  // Helper function for lookup: 1) pin the node if asked; 2) refresh LRU if in
+  // the LRU list
+  void lookup_refresh(Node_t* node, bool pin);
 
   Node_t* alloc_node();
   void free_node(Node_t* e);
@@ -205,7 +201,7 @@ inline LRUCache<Key_t, Value_t, Hash>::LRUCache()
 
 template <typename Key_t, typename Value_t, typename Hash>
 inline LRUCache<Key_t, Value_t, Hash>::~LRUCache() {
-  /* Error if caller has an unreleased node */
+  /* Could be an error if caller has an unreleased node */
   // assert(in_use_.next == &in_use_);
 
   /**
@@ -213,7 +209,6 @@ inline LRUCache<Key_t, Value_t, Hash>::~LRUCache() {
    * not `init`, which means it owns neither pool_ nor table_. In this case, all
    * nodes have been freed so must avoid accessing them
    */
-
   if (pool_) {
     /* Unnecessary for correctness, but kept to ease debugging */
     // for (const Node_t* e = lru_.next; e != &lru_; e = e->next)
@@ -221,6 +216,7 @@ inline LRUCache<Key_t, Value_t, Hash>::~LRUCache() {
     delete[] pool_;
     delete table_;
   }
+  /* `extrac_pool_` is always owned by this instance. */
   for (auto e : extra_pool_) delete e;
 }
 
@@ -247,9 +243,7 @@ template <typename Key_t, typename Value_t, typename Hash>
 template <typename Fn>
 inline void LRUCache<Key_t, Value_t, Hash>::init(size_t capacity, Fn&& fn) {
   init(capacity);
-  for (size_t i = 0; i < capacity; ++i) {
-    fn(&pool_[i]);
-  }
+  for (size_t i = 0; i < capacity; ++i) fn(&pool_[i]);
 }
 
 template <typename Key_t, typename Value_t, typename Hash>
@@ -292,16 +286,14 @@ LRUCache<Key_t, Value_t, Hash>::insert_impl(Key_t key, uint32_t hash, bool pin,
   assert(capacity_ > 0);
 
   // Search to see if already exists
-  Node_t* e;
-
   if (!hint_nonexist) {  // if not sure whether the key exists, do lookup
-    e = lookup_impl(key, hash, pin);
+    Node_t* e = lookup_impl(key, hash, pin);  // lookup_impl will do LRU refresh
     if (e) return e;
   } else {
-    assert(!lookup_impl(key, hash, pin));  // check if hint is correct
+    assert(!table_->lookup(key, hash));  // check if hint is correct
   }
 
-  e = alloc_node();
+  Node_t* e = alloc_node();
   if (!e) return nullptr;
   e->init(key, hash);
   table_->insert(e);
@@ -332,6 +324,8 @@ LRUCache<Key_t, Value_t, Hash>::lookup_impl(Key_t key, uint32_t hash,
 
 template <typename Key_t, typename Value_t, typename Hash>
 inline void LRUCache<Key_t, Value_t, Hash>::release(Handle_t handle) {
+  // release can only called if the caller has previously pinned the handle;
+  // the handle thus must still have nonzero refs
   Node_t* e = handle.node;
   assert(e->refs > 1);
   unref(e);
@@ -347,9 +341,9 @@ template <typename Key_t, typename Value_t, typename Hash>
 inline typename LRUCache<Key_t, Value_t, Hash>::Handle_t
 LRUCache<Key_t, Value_t, Hash>::preempt() {
   // In fact, it is just like allocate a handle but instead of using it
-  // immediately, return it out to caller (i.e. SharedCache)
+  // immediately, return it out to caller (i.e. SharedCache).
   // We keep this function independent from `alloc_node` to make it
-  // semantically clear
+  // semantically clear.
   --capacity_;
   return alloc_node();
 }
@@ -418,7 +412,7 @@ inline typename LRUCache<Key_t, Value_t, Hash>::Node_t*
 LRUCache<Key_t, Value_t, Hash>::import_node_impl(Key_t key) {
   Node_t* e;
   if (exported_.next == &exported_) {
-    e = new Node_t;
+    e = new Node_t;  // caller is responsible for setting the value
     extra_pool_.emplace_back(e);
   } else {
     e = exported_.next;

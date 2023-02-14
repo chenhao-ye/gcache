@@ -81,9 +81,9 @@ class SharedCache {
   void init(const std::vector<std::pair<Tag_t, size_t>>& tenant_configs,
             Fn&& fn);
 
-  size_t capacity() { return total_capacity_; }
+  size_t capacity() const { return total_capacity_; }
   // Return the current cache capacity associated with the given tag
-  size_t capacity_of(Tag_t tag);
+  size_t capacity_of(Tag_t tag) const;
 
   // For each item in the cache, call fn(key, handle)
   template <typename Fn>
@@ -159,7 +159,7 @@ inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::init(
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
-size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::capacity_of(Tag_t tag) {
+size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::capacity_of(Tag_t tag) const {
   assert(tenant_cache_map_.contains(tag));
   return tenant_cache_map_[tag].capacity();
 }

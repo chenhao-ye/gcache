@@ -161,7 +161,7 @@ inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::init(
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::capacity_of(Tag_t tag) const {
   assert(tenant_cache_map_.contains(tag));
-  return tenant_cache_map_[tag].capacity();
+  return tenant_cache_map_.find(tag)->second.capacity();
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>

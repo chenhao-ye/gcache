@@ -1,5 +1,5 @@
 /**
- * Credit: this code is ported from Google LevelDB.
+ * Credit: this code is originally modified from Google LevelDB.
  */
 #pragma once
 

@@ -39,14 +39,14 @@ Below is an example of LRU cache usage. It allocate a page cache space (2 pages 
 char* page_cache = new char[4096 * 2];  // allocate a 2-page cache
 
 using Cache_t = gcache::LRUCache</*Key_t*/ uint32_t, /*Value_t*/ char*,
-																	/*Hash*/ gcache::ghash>;
+                                  /*Hash*/ gcache::ghash>;
 Cache_t lru_cache;
 // init: 1) set cache capacity; 2) put page cache pointers into buffer
 lru_cache.init(/*capacity*/ 2,
-								/* init_func*/
-								[&, i = 0l](Cache_t::Handle_t handle) mutable {
-									*handle = page_cache + (i++) * 4096;
-								});
+                /* init_func*/
+                [&, i = 0l](Cache_t::Handle_t handle) mutable {
+                  *handle = page_cache + (i++) * 4096;
+                });
 // alternatively, one could just use `insert`
 
 // add block 1 & 2

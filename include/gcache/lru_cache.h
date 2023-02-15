@@ -286,14 +286,15 @@ LRUCache<Key_t, Value_t, Hash>::insert_impl(Key_t key, uint32_t hash, bool pin,
   assert(capacity_ > 0);
 
   // Search to see if already exists
+  Node_t* e;
   if (!hint_nonexist) {  // if not sure whether the key exists, do lookup
-    Node_t* e = lookup_impl(key, hash, pin);  // lookup_impl will do LRU refresh
+    e = lookup_impl(key, hash, pin);  // lookup_impl will do LRU refresh
     if (e) return e;
   } else {
     assert(!table_->lookup(key, hash));  // check if hint is correct
   }
 
-  Node_t* e = alloc_node();
+  e = alloc_node();
   if (!e) return nullptr;
   e->init(key, hash);
   table_->insert(e);

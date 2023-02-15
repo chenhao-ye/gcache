@@ -91,7 +91,8 @@ class SharedCache {
 
   // Insert a handle into cache with given key and hash if not exists; if does,
   // return the existing one
-  Handle_t insert(Tag_t tag, Key_t key, bool pin = false);
+  Handle_t insert(Tag_t tag, Key_t key, bool pin = false,
+                  bool hint_nonexist = false);
   // Search for a handle; return nullptr if not exist; no tag required because
   // there is no insertion may happen
   // FIXME: However, this op will refresh LRU list, so a tenant A could
@@ -174,12 +175,18 @@ inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::for_each(Fn&& fn) {
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t
-SharedCache<Tag_t, Key_t, Value_t, Hash>::insert(Tag_t tag, Key_t key,
-                                                 bool pin) {
+SharedCache<Tag_t, Key_t, Value_t, Hash>::insert(Tag_t tag, Key_t key, bool pin,
+                                                 bool hint_nonexist) {
   uint32_t hash = Hash{}(key);
   assert(tenant_cache_map_.contains(tag));
-  Node_t* e = lookup_impl(key, hash, pin);
-  if (e) return e;
+
+  Node_t* e;
+  if (!hint_nonexist) {
+    e = lookup_impl(key, hash, pin);
+    if (e) return e;
+  } else {
+    assert(!table_.lookup(key, hash));
+  }
 
   // The key does not exist in the cache, perform insertion
   e = tenant_cache_map_[tag].insert_impl(key, hash, pin, /*not_exist*/ true);

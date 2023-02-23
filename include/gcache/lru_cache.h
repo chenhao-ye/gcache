@@ -395,6 +395,9 @@ inline bool LRUCache<Key_t, Value_t, Hash>::export_node(Handle_t handle) {
   if (e->refs != 1) return false;
   list_remove(e);
   list_append(&exported_, e);
+  // it's actually fine to not decrement refs because later `Node_t::init` will
+  // reset it. however, decrement it can help to detect "double-export" issue.
+  --e->refs;
   [[maybe_unused]] Node_t* e_;
   e_ = table_->remove(e->key, e->hash);
   assert(e_ == e);

@@ -19,6 +19,8 @@ cmake ..
 make -j
 ```
 
+The default build uses Intel SSE4.2 instruction set for the efficient CRC hash computation. If this is not compatible to your machine, you could modify `gcache::ghash` in `include/gcache/hash.h` to use other hash functions and remove `-msse4.2` from `CMakeLists.txt`.
+
 ## Usage
 
 The major functionality of gcache is implemented as four classes:
@@ -36,8 +38,8 @@ The major functionality of gcache is implemented as four classes:
 Below is an example of LRU cache usage. It allocates a page cache space (2 pages in this example). The key of the cache operation is the block number, and the value is a pointer to a page cache slot. For more advanced usage, one could use a struct that contains not only the pointer but additional metadata (e.g., whether the page is dirty).
 
 ```C++
-#include <gcache/lru_cache.h>
 #include <gcache/hash.h>  // provide useful hash function
+#include <gcache/lru_cache.h>
 
 char* page_cache = new char[4096 * 2];  // allocate a 2-page cache
 
@@ -90,7 +92,6 @@ Ghost cache is a type of cache maintained to answer the question "what the cache
 
 ```C++
 #include <gcache/ghost_cache.h>
-#include <gcache/hash.h>  // provide useful hash function
 
 // ctor needs the spectrum of cache sizes: the example below will maintain hit
 // rates for size=[4, 6, 8]
@@ -129,6 +130,66 @@ gcache::SampledGhostCache</*SampleShift*/5> ghost_cache(
 Using sampling not only reduces the computation and memory cost when playing the block access trace but also significantly reduces the footprint on the CPU cache. As a result, the end throughput improvement might be much higher than `1 << SampleShift`.
 
 ### Shared Cache
+
+`SharedCache` is a more advanced version of LRU cache: multitenant cache. This is designed for a scenario where:
+
+1. there is a fixed cache space shared by multiple tenants
+2. each tenant has an upper-bound of cache size it can use
+3. within each tenant's limit, an LRU replacement policy is used
+
+Each tenant is identified by a unique "tag," which could be an integer or a pointer to some struct.
+
+```C++
+#include <gcache/hash.h>
+#include <gcache/shared_cache.h>
+
+struct Tenant {
+  std::string name;
+  // skip other fields...
+};
+
+char* page_cache = new char[4096 * 20];  // allocate a 20-page cache
+
+using Cache_t = gcache::SharedCache</*Tag_t*/ Tenant*, /*Key_t*/ uint32_t,
+                                    /*Value_t*/ char*,
+                                    /*Hash*/ gcache::ghash>;
+Cache_t lru_cache;
+
+Tenant* t1 = new Tenant{"tenant-1"};
+Tenant* t2 = new Tenant{"tenant-2"};
+
+// init: 1) set cache capacity: tenant-1 has 8-page cache; tenant-2 has
+// 12-page cache; 2) put page cache pointer into buffer
+lru_cache.init(/*vector of <tag, capacity>*/ {{t1, 8}, {t2, 12}},
+                /* init_func*/
+                [&, i = 0l](Cache_t::Handle_t handle) mutable {
+                  *handle = page_cache + (i++) * 4096;
+                });
+
+// add block 1 & 2 to tenant-1
+auto h1 = lru_cache.insert(/*tag*/ t1, /*key: block_num*/ 1);
+memcpy(/*buf*/ *h1, "This is block 1", 16);
+auto h2 = lru_cache.insert(t1, 2);
+memcpy(*h2, "This is block 2", 16);
+
+// add block 3 to tenant-2
+auto h3 = lru_cache.insert(t2, 3);
+memcpy(*h3, "This is block 3", 16);
+
+// since cache pool is shared, `lookup` does not requies tag
+h2 = lru_cache.lookup(2);
+assert(memcmp(*h2, "This is block 2", 16) == 0);
+
+// `relocate` could move some cache capacity from one tenant to another tenant
+// move 2 blocks from tenant-2 to tenant-1
+size_t num_relocated = lru_cache.relocate(/*src*/ t2, /*dst*/ t1, /*size*/ 2);
+assert(num_relocated == 2);
+
+size_t t1_size = lru_cache.capacity_of(t1);
+size_t t2_size = lru_cache.capacity_of(t2);
+assert(t1_size == /*init_size*/ 8 + /*relocated*/ 2);
+assert(t2_size == /*init_size*/ 12 - /*relocated*/ 2);
+```
 
 ## Credits
 

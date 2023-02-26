@@ -1,6 +1,6 @@
 # gcache
 
-gcache is a high-performance header-only LRU cache library. It provides not only a customizable cache implementation, but also support advanced features like ghost cache, multitenant cache.
+gcache is a high-performance header-only LRU cache library. It provides not only a customizable cache implementation, but also support advanced features like ghost cache and multitenant cache.
 
 ## Build
 
@@ -36,6 +36,9 @@ The major functionality of gcache is implemented as four classes:
 Below is an example of LRU cache usage. It allocate a page cache space (2 pages in this example). The key of the cache operation is the block number, and the value is a pointer to a page cache slot. For more advanced usage, one could use a struct that contains not only the pointer but additional metadata (e.g., whether the page is dirty).
 
 ```C++
+#include <gcache/lru_cache.h>
+#include <gcache/hash.h>  // provide useful hash function
+
 char* page_cache = new char[4096 * 2];  // allocate a 2-page cache
 
 using Cache_t = gcache::LRUCache</*Key_t*/ uint32_t, /*Value_t*/ char*,
@@ -82,6 +85,45 @@ lru_cache.release(h1_pinned);
 ```
 
 ### Ghost Cache
+
+Ghost cache is a type of cache maintained to answer the question "what will be cache hit rate if the cache size is X." It maintains the metadata of each cache slot without actual cache space.
+
+```C++
+#include <gcache/ghost_cache.h>
+#include <gcache/hash.h>  // provide useful hash function
+
+// ctor needs the spectrum of cache sizes: the example below will maintain hit
+// rates for size=[4, 6, 8]
+gcache::GhostCache ghost_cache(/*tick*/ 2, /*min_size*/ 4, /*max_size*/ 8);
+
+// preheat: fill the cache
+for (auto blk_id : {1, 2, 3, 4, 5, 6, 7, 8}) ghost_cache.access(blk_id);
+
+// don't count the preheat ops towards hit rate status
+ghost_cache.reset_stat();
+
+// now run a trace of block accesses
+for (auto blk_id : {8, 5, 3, 2, 2, 1, 9, 10}) ghost_cache.access(blk_id);
+
+// show the hit rates
+for (uint32_t cache_size = 4; cache_size <= 8; cache_size += 2)
+  std::cout << "hit rate for size " << cache_size << ": "
+            << ghost_cache.get_hit_rate(cache_size) << std::endl;
+// expect size -> hit rate: {4: 0.375, 6: 0.5, 8: 0.75}
+```
+
+### Sampled Ghost Cache
+
+Although ghost cache only maintains metadata of each cache slot, it could still be expensive to maintain both in terms of computation and memory. A good alternative is to use sampling. `SampledGhostCache` only samples a subspace of blocks. With proper sample rate, it could produce a decent approximation.
+
+Using `SampledGhostCache` is straightforward. It is similar to `GhostCache` with an additional type parameter `SampleShift`, which indicates a sample rate of `1 / (1 << SampleShift)`. The default `SampleShift` is 5 (i.e., 1/32 sample rate).
+
+```C++
+// to make sure sampling is reasonable, `tick` must be no smaller than sample
+// rate, and `min_size` and `max_size` must be multiple of sample rate.
+gcache::SampledGhostCache<5> ghost_cache(/*tick*/ 64, /*min_size*/ 128, /*max_size*/ 640);
+// or use `gcache::SampledGhostCache<>` to use default SampleShift=5
+```
 
 ### Shared Cache
 

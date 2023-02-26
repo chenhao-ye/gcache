@@ -1,6 +1,6 @@
 # gcache
 
-gcache is a high-performance header-only LRU cache library. It provides not only a customizable cache implementation, but also support advanced features like ghost cache and multitenant cache.
+gcache is a high-performance header-only LRU cache library. It provides not only a customizable cache implementation, but also supports advanced features like ghost cache and multitenant cache.
 
 ## Build
 
@@ -25,15 +25,15 @@ The major functionality of gcache is implemented as four classes:
 
 - `LRUCache`: Basic implementation of a LRU Cache.
 
-- `GhostCache`: A ghost cache is a metadata-only cache. It reports the hit rate for a spectrum of cache size. This is useful to tune cache size.
+- `GhostCache`: A ghost cache is a metadata-only cache. It reports the hit rate for a spectrum of cache sizes. This is useful to tune cache size.
 
-- `SampledGhostCache`: This is an augmented version of `GhostCache`. Instead of running over a full trace, it only samples a subspace. This could produce hit rate with decent accuracy, but with much less overhead.
+- `SampledGhostCache`: This is an augmented version of `GhostCache`. Instead of running over a full trace, it only samples a subspace. This could produce hit rates with decent accuracy, but with much less overhead.
 
-- `SharedCache`: This is a multitenant cache: multiple tenants share a limited cache capacity. User could adjust each individual's cache size.
+- `SharedCache`: This is a multitenant cache: multiple tenants share a limited cache capacity. Users could adjust each individual's cache size.
 
 ### LRU Cache
 
-Below is an example of LRU cache usage. It allocate a page cache space (2 pages in this example). The key of the cache operation is the block number, and the value is a pointer to a page cache slot. For more advanced usage, one could use a struct that contains not only the pointer but additional metadata (e.g., whether the page is dirty).
+Below is an example of LRU cache usage. It allocates a page cache space (2 pages in this example). The key of the cache operation is the block number, and the value is a pointer to a page cache slot. For more advanced usage, one could use a struct that contains not only the pointer but additional metadata (e.g., whether the page is dirty).
 
 ```C++
 #include <gcache/lru_cache.h>
@@ -86,7 +86,7 @@ lru_cache.release(h1_pinned);
 
 ### Ghost Cache
 
-Ghost cache is a type of cache maintained to answer the question "what will be cache hit rate if the cache size is X." It maintains the metadata of each cache slot without actual cache space.
+Ghost cache is a type of cache maintained to answer the question "what the cache hit rate will be if the cache size is X." It maintains the metadata of each cache slot without actual cache space.
 
 ```C++
 #include <gcache/ghost_cache.h>
@@ -114,19 +114,19 @@ for (uint32_t cache_size = 4; cache_size <= 8; cache_size += 2)
 
 ### Sampled Ghost Cache
 
-Although ghost cache only maintains metadata of each cache slot, it could still be expensive to maintain both in terms of computation and memory. A good alternative is to use sampling. `SampledGhostCache` only samples a subspace of blocks. With proper sample rate, it could produce a decent approximation.
+Although ghost cache only the maintains metadata of each cache slot, it could still be expensive to maintain both in terms of computation and memory. A good alternative is to use sampling. `SampledGhostCache` only samples a subspace of blocks. With a proper sample rate, it could produce a decent approximation.
 
 Using `SampledGhostCache` is straightforward. It is similar to `GhostCache` with an additional type parameter `SampleShift`, which indicates a sample rate of `1 / (1 << SampleShift)`. The default `SampleShift` is 5 (i.e., 1/32 sample rate).
 
 ```C++
-// to make sure sampling is reasonable, `tick` must be no smaller than sample
-// rate, and `min_size` and `max_size` must be multiple of sample rate.
+// to make sure sampling is reasonable, `tick` must be no smaller than the
+// sample rate, and `min_size` and `max_size` must be multiple of sample rate.
 gcache::SampledGhostCache</*SampleShift*/5> ghost_cache(
   /*tick*/ 64, /*min_size*/ 128, /*max_size*/ 640);
 // or use `gcache::SampledGhostCache<>` to use default SampleShift=5
 ```
 
-Use sampling not only reduce the computation and memory cost when playing the block access trace, but also significantly reduce the footprint on CPU cache. As a result, the end throughput improvement might be much higher than `1 << SampleShift`.
+Using sampling not only reduces the computation and memory cost when playing the block access trace but also significantly reduces the footprint on the CPU cache. As a result, the end throughput improvement might be much higher than `1 << SampleShift`.
 
 ### Shared Cache
 

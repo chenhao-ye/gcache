@@ -158,8 +158,8 @@ Cache_t lru_cache;
 Tenant* t1 = new Tenant{"tenant-1"};
 Tenant* t2 = new Tenant{"tenant-2"};
 
-// init: 1) set cache capacity: tenant-1 has 8-page cache; tenant-2 has
-// 12-page cache; 2) put page cache pointer into buffer
+// init: 1) set cache capacity: tenant-1 has 8-page cache; tenant-2 has 12-page
+// cache; 2) put page cache pointer into buffer
 lru_cache.init(/*vector of <tag, capacity>*/ {{t1, 8}, {t2, 12}},
                 /* init_func*/
                 [&, i = 0l](Cache_t::Handle_t handle) mutable {
@@ -176,12 +176,12 @@ memcpy(*h2, "This is block 2", 16);
 auto h3 = lru_cache.insert(t2, 3);
 memcpy(*h3, "This is block 3", 16);
 
-// since cache pool is shared, `lookup` does not requies tag
+// since the cache pool is shared, `lookup` does not requie tag
 h2 = lru_cache.lookup(2);
 assert(memcmp(*h2, "This is block 2", 16) == 0);
 
 // `relocate` could move some cache capacity from one tenant to another tenant
-// move 2 blocks from tenant-2 to tenant-1
+// move 2 block capacity from tenant-2 to tenant-1
 size_t num_relocated = lru_cache.relocate(/*src*/ t2, /*dst*/ t1, /*size*/ 2);
 assert(num_relocated == 2);
 

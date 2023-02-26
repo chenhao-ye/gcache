@@ -121,9 +121,12 @@ Using `SampledGhostCache` is straightforward. It is similar to `GhostCache` with
 ```C++
 // to make sure sampling is reasonable, `tick` must be no smaller than sample
 // rate, and `min_size` and `max_size` must be multiple of sample rate.
-gcache::SampledGhostCache<5> ghost_cache(/*tick*/ 64, /*min_size*/ 128, /*max_size*/ 640);
+gcache::SampledGhostCache</*SampleShift*/5> ghost_cache(
+  /*tick*/ 64, /*min_size*/ 128, /*max_size*/ 640);
 // or use `gcache::SampledGhostCache<>` to use default SampleShift=5
 ```
+
+Use sampling not only reduce the computation and memory cost when playing the block access trace, but also significantly reduce the footprint on CPU cache. As a result, the end throughput improvement might be much higher than `1 << SampleShift`.
 
 ### Shared Cache
 

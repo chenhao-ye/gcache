@@ -77,15 +77,16 @@ void test1() {
   std::cout << "Expect: { 564: [6, 7, 8, 9], 537: [2] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
-  // test export/import
-  [[maybe_unused]] bool success = shared_cache.export_node(h);
+  // test erase/install
+  [[maybe_unused]] bool success = shared_cache.erase(h);
   assert(success);
   std::cout << "Expect: { 564: [6, 7, 8], 537: [2] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
-  shared_cache.import_node(537, 10);
-  shared_cache.import_node(537, 11);
-  shared_cache.import_node(564, 12);
+  // setting values is skipped...
+  shared_cache.install(537, 10);
+  shared_cache.install(537, 11);
+  shared_cache.install(564, 12);
   std::cout << "Expect: { 564: [6, 7, 8, 12], 537: [2, 10, 11] }" << std::endl;
   std::cout << shared_cache << std::endl;
 }

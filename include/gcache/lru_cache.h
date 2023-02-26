@@ -73,24 +73,24 @@ class LRUCache {
   void pin(Handle_t handle);
 
   /**
-   * The normal opeartions (insert/lookup/release) will only cause a node to
-   * flow among the lru list, the in_use list, and the free list.
-   * Only export will force a node to jump out of circulation, and only import
-   * may put a node back. When a node is exported, its value is trashed
-   * (considered as garbage bits); this is semantically different from a node
-   * in free list, where the value is long-lived. If the caller get a node
-   * from `import_node`, the value fields must be overwritten before any read.
+   * The normal opeartions (`insert`/`lookup`/`release`) will only cause a node
+   * to flow among the lru list, the in-use list, and the free list.
+   * Only `erase` will force a node to jump out of circulation, and only
+   * `install` may add a node. When a node is erased, its value is trashed
+   * (considered as random garbage bits); this is semantically different from a
+   * node in the free list, where the value is long-lived. If the caller get a
+   * node from `install`, the value fields must be overwritten before any read.
    */
 
   // Erase the non-null handle from the lru list; return whether erasing
   // succeeds (fail if not in lru). The erased handle will not be reused by
   // `insert`, and the caller should save the value if necessary.
-  bool export_node(Handle_t handle);
+  bool erase(Handle_t handle);
 
   // Install a handle into the lru list. This action will not use free list or
-  // lru list but allocate additional space or reused space from exported
+  // lru list but allocate additional space or reused space from erased
   // handles. The caller should set the value immediately.
-  Handle_t import_node(Key_t key);
+  Handle_t install(Key_t key);
 
  private:
   /****************************************************************************/
@@ -124,7 +124,7 @@ class LRUCache {
   /* some internal implementation APIs (used by other classes in gcache) */
   Node_t* insert_impl(Key_t key, uint32_t hash, bool pin, bool hint_nonexist);
   Node_t* lookup_impl(Key_t key, uint32_t hash, bool pin);
-  Node_t* import_node_impl(Key_t key);
+  Node_t* install_impl(Key_t key);
   // Helper function for lookup: 1) pin the node if asked; 2) refresh LRU if in
   // the LRU list
   void lookup_refresh(Node_t* node, bool pin);
@@ -165,14 +165,14 @@ class LRUCache {
   // Dummy head of free list.
   Node_t free_;
 
-  /* `exported_` and `extra_pool_` are only used by `export/install_handle`. */
+  /* `erased_` and `extra_pool_` are only used by `erase/install`. */
 
-  // Dummy head of exported list.
-  // Entries here are exported, and all fields are just random garbage. This
-  // list is only maintained for memory efficiency purposes.
-  Node_t exported_;
+  // Dummy head of erased list.
+  // Entries here are erased, and all fields are just random garbage.
+  // This list is only maintained for memory efficiency purposes.
+  Node_t erased_;
 
-  // Pool for additionaly installed handles.
+  // Pool for additionaly allocated handles.
   std::vector<Node_t*> extra_pool_;
 
   friend class GhostCache;
@@ -194,8 +194,8 @@ inline LRUCache<Key_t, Value_t, Hash>::LRUCache()
   lru_.prev = &lru_;
   in_use_.next = &in_use_;
   in_use_.prev = &in_use_;
-  exported_.next = &exported_;
-  exported_.prev = &exported_;
+  erased_.next = &erased_;
+  erased_.prev = &erased_;
   // free_ will be initialized when init() is called
 }
 
@@ -389,14 +389,14 @@ LRUCache<Key_t, Value_t, Hash>::refresh(Key_t key, uint32_t hash,
 }
 
 template <typename Key_t, typename Value_t, typename Hash>
-inline bool LRUCache<Key_t, Value_t, Hash>::export_node(Handle_t handle) {
+inline bool LRUCache<Key_t, Value_t, Hash>::erase(Handle_t handle) {
   Node_t* e = handle.node;
   assert(e);
   if (e->refs != 1) return false;
   list_remove(e);
-  list_append(&exported_, e);
+  list_append(&erased_, e);
   // it's actually fine to not decrement refs because later `Node_t::init` will
-  // reset it. however, decrement it can help to detect "double-export" issue.
+  // reset it. however, decrement it can help to detect "double-erase" issue.
   --e->refs;
   [[maybe_unused]] Node_t* e_;
   e_ = table_->remove(e->key, e->hash);
@@ -407,19 +407,19 @@ inline bool LRUCache<Key_t, Value_t, Hash>::export_node(Handle_t handle) {
 
 template <typename Key_t, typename Value_t, typename Hash>
 inline typename LRUCache<Key_t, Value_t, Hash>::Handle_t
-LRUCache<Key_t, Value_t, Hash>::import_node(Key_t key) {
-  return import_node_impl(key);
+LRUCache<Key_t, Value_t, Hash>::install(Key_t key) {
+  return install_impl(key);
 }
 
 template <typename Key_t, typename Value_t, typename Hash>
 inline typename LRUCache<Key_t, Value_t, Hash>::Node_t*
-LRUCache<Key_t, Value_t, Hash>::import_node_impl(Key_t key) {
+LRUCache<Key_t, Value_t, Hash>::install_impl(Key_t key) {
   Node_t* e;
-  if (exported_.next == &exported_) {
+  if (erased_.next == &erased_) {
     e = new Node_t;  // caller is responsible for setting the value
     extra_pool_.emplace_back(e);
   } else {
-    e = exported_.next;
+    e = erased_.next;
     list_remove(e);
   }
   e->init(key, Hash{}(key));

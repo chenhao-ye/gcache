@@ -111,9 +111,9 @@ class SharedCache {
   // return; return number of handles relocated successfully
   size_t relocate(Tag_t src, Tag_t dst, size_t size);
 
-  // Similar to LRUCache export/import_node
-  bool export_node(Handle_t handle);
-  Handle_t import_node(Tag_t tag, Key_t key);
+  // Similar to LRUCache erase/install
+  bool erase(Handle_t handle);
+  Handle_t install(Tag_t tag, Key_t key);
 
  private:
   Node_t* lookup_impl(Key_t key, uint32_t hash, bool pin);
@@ -249,17 +249,16 @@ inline size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::relocate(Tag_t src,
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
-inline bool SharedCache<Tag_t, Key_t, Value_t, Hash>::export_node(
-    Handle_t handle) {
+inline bool SharedCache<Tag_t, Key_t, Value_t, Hash>::erase(Handle_t handle) {
   assert(tenant_cache_map_.contains(handle.get_tag()));
-  return tenant_cache_map_[handle.get_tag()].export_node(handle.untagged());
+  return tenant_cache_map_[handle.get_tag()].erase(handle.untagged());
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t
-SharedCache<Tag_t, Key_t, Value_t, Hash>::import_node(Tag_t tag, Key_t key) {
+SharedCache<Tag_t, Key_t, Value_t, Hash>::install(Tag_t tag, Key_t key) {
   assert(tenant_cache_map_.contains(tag));
-  return tenant_cache_map_[tag].import_node_impl(key);
+  return tenant_cache_map_[tag].install_impl(key);
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>

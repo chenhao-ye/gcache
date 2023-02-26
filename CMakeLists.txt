@@ -30,6 +30,7 @@ add_executable(gcache_test_lru ${SOURCE_FILES} tests/test_lru.cpp)
 add_executable(gcache_test_shared ${SOURCE_FILES} tests/test_shared.cpp)
 add_executable(gcache_test_ghost ${SOURCE_FILES} tests/test_ghost.cpp)
 add_executable(gcache_bench_ghost ${SOURCE_FILES} benchmarks/bench_ghost.cpp)
+add_executable(test ${SOURCE_FILES} test.cpp)
 
 if(SAMPLE_SHIFT)
 	target_compile_definitions(gcache_bench_ghost PRIVATE SAMPLE_SHIFT=${SAMPLE_SHIFT})

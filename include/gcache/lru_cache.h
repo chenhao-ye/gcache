@@ -345,8 +345,9 @@ LRUCache<Key_t, Value_t, Hash>::preempt() {
   // immediately, return it out to caller (i.e. SharedCache).
   // We keep this function independent from `alloc_node` to make it
   // semantically clear.
-  --capacity_;
-  return alloc_node();
+  Node_t* e = alloc_node();
+  if (e) --capacity_;
+  return e;
 }
 
 template <typename Key_t, typename Value_t, typename Hash>

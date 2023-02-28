@@ -13,7 +13,7 @@ class SharedCache;
 
 template <typename Tag_t, typename Value_t>
 struct TaggedValue {
-  Tag_t tag{};
+  Tag_t tag;
   Value_t value;
 };
 

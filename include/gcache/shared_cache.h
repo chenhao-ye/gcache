@@ -258,7 +258,10 @@ template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t
 SharedCache<Tag_t, Key_t, Value_t, Hash>::install(Tag_t tag, Key_t key) {
   assert(tenant_cache_map_.contains(tag));
-  return tenant_cache_map_[tag].install_impl(key);
+  Node_t* e = tenant_cache_map_[tag].install_impl(key);
+  Handle_t h(e);
+  h.set_tag(tag);
+  return h;
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>

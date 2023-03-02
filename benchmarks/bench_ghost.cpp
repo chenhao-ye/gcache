@@ -24,6 +24,7 @@ static uint64_t num_ops = 10'000'000;                    // 10M
 static uint64_t preheat_num_ops = num_ops / 10;
 static double zipf_theta = 0.99;
 static uint64_t rand_seed = 0x537;  // enable different runs
+static uint64_t base_offset = 0;
 
 static uint32_t cache_tick = num_blocks / 32;
 static uint32_t cache_min = cache_tick;
@@ -79,6 +80,9 @@ void parse_args(int argc, char* argv[]) {
       run_sampled = false;
     } else if (sscanf(argv[i], "--rand_seed=%ld%c", &n, &junk) == 1) {
       rand_seed = n;
+      std::mt19937 rng(rand_seed + 0x564);
+      std::uniform_int_distribution<uint64_t> dist(0, 1UL << 31);
+      base_offset = dist(rng);
     } else {
       std::cerr << "Invalid argument: " << argv[i] << std::endl;
       exit(1);

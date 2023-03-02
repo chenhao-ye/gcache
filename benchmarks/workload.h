@@ -103,8 +103,10 @@ struct Offsets {
   };
 
   Offsets(size_t num, const OffsetType type, uint64_t size, off_t align,
-          double zipf_theta = 0, uint64_t seed = 0x537)
-      : num(num), gen(get_generator(type, size, align, zipf_theta, seed)) {}
+          double zipf_theta = 0, uint64_t base_offset = 0,
+          uint64_t seed = 0x537)
+      : num(num),
+        gen(get_generator(type, size, align, zipf_theta, base_offset, seed)) {}
   Offsets(const Offsets&) = delete;
   ~Offsets() { delete gen; }
 
@@ -114,14 +116,16 @@ struct Offsets {
 
   static BaseGenerator* get_generator(const OffsetType type, uint64_t size,
                                       off_t align, double zipf_theta,
-                                      uint64_t seed) {
+                                      uint64_t base_offset, uint64_t seed) {
     switch (type) {
       case OffsetType::SEQ:
-        return new SeqGenerator(0, size - 1, align);
+        return new SeqGenerator(base_offset, base_offset + size - 1, align);
       case OffsetType::UNIF:
-        return new UnifGenerator(0, size - 1, align, seed);
+        return new UnifGenerator(base_offset, base_offset + size - 1, align,
+                                 seed);
       case OffsetType::ZIPF:
-        return new ZipfGenerator(0, size - 1, zipf_theta, align, seed);
+        return new ZipfGenerator(base_offset, base_offset + size - 1,
+                                 zipf_theta, align, seed);
       default:
         throw std::runtime_error("Unimplemented offset type");
     }

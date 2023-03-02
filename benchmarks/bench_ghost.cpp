@@ -23,6 +23,7 @@ static uint64_t num_blocks = 1024 * 1024 * 1024 / 4096;  // 1 GB
 static uint64_t num_ops = 10'000'000;                    // 10M
 static uint64_t preheat_num_ops = num_ops / 10;
 static double zipf_theta = 0.99;
+static uint64_t rand_seed = 0x537;  // enable different runs
 
 static uint32_t cache_tick = num_blocks / 32;
 static uint32_t cache_min = cache_tick;
@@ -76,6 +77,8 @@ void parse_args(int argc, char* argv[]) {
       run_ghost = false;
     } else if (strcmp(argv[i], "--no_sampled") == 0) {
       run_sampled = false;
+    } else if (sscanf(argv[i], "--rand_seed=%ld%c", &n, &junk) == 1) {
+      rand_seed = n;
     } else {
       std::cerr << "Invalid argument: " << argv[i] << std::endl;
       exit(1);
@@ -96,8 +99,9 @@ int main(int argc, char* argv[]) {
 
   // we dump all config and data into a csv file for parser
   std::ofstream ofs_perf(result_dir / "perf.csv");
-  ofs_perf << "workload,num_blocks,num_ops,zipf_theta,cache_tick,cache_min,"
-              "cache_max,sample_shift,baseline_us,ghost_us,sampled_us,"
+  ofs_perf << "workload,num_blocks,num_ops,zipf_theta,"
+              "cache_tick,cache_min,cache_max,sample_shift,rand_seed,"
+              "baseline_us,ghost_us,sampled_us,"
               "ghost_cost_uspop,sampled_cost_uspop,avg_err,max_err\n";
 
   std::cout << "Config: wl_type=";
@@ -120,14 +124,15 @@ int main(int argc, char* argv[]) {
   std::cout << ", num_blocks=" << num_blocks << ", num_ops=" << num_ops
             << ", zipf_theta=" << zipf_theta << ", cache_tick=" << cache_tick
             << ", cache_min=" << cache_min << ", cache_max=" << cache_max
-            << ", sample_shift=" << SAMPLE_SHIFT << std::endl;
+            << ", sample_shift=" << SAMPLE_SHIFT << ", rand_seed=" << rand_seed
+            << std::endl;
   ofs_perf << ',' << num_blocks << ',' << num_ops << ',' << zipf_theta << ','
            << cache_tick << ',' << cache_min << ',' << cache_max << ','
-           << SAMPLE_SHIFT;
+           << SAMPLE_SHIFT << ',' << rand_seed;
 
-  Offsets offsets1(num_ops, wl_type, num_blocks, 1, zipf_theta);
-  Offsets offsets2(num_ops, wl_type, num_blocks, 1, zipf_theta);
-  Offsets offsets3(num_ops, wl_type, num_blocks, 1, zipf_theta);
+  Offsets offsets1(num_ops, wl_type, num_blocks, 1, zipf_theta, rand_seed);
+  Offsets offsets2(num_ops, wl_type, num_blocks, 1, zipf_theta, rand_seed);
+  Offsets offsets3(num_ops, wl_type, num_blocks, 1, zipf_theta, rand_seed);
 
   uint64_t offset_checksum1 = 0, offset_checksum2 = 0, offset_checksum3 = 0;
 
@@ -137,7 +142,7 @@ int main(int argc, char* argv[]) {
 
   // preheat: run a subset of stream to populate the cache
   Offsets prehead_offsets(preheat_num_ops, wl_type, num_blocks, 1, zipf_theta,
-                          /*seed*/ 0x736);
+                          /*seed*/ rand_seed + 0x736);
   auto preheat_begin_ts = std::chrono::high_resolution_clock::now();
   for (auto off : prehead_offsets) {
     if (run_ghost) ghost_cache.access(off);

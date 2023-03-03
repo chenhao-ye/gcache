@@ -1,6 +1,6 @@
 set -e  # stop if any command fails
 
-cache_tick=4096 # 64 ticks
+cache_tick=8192  # 32 ticks
 
 run_cmd() {
 	wl=$1

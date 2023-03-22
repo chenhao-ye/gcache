@@ -20,11 +20,16 @@
 
 static OffsetType wl_type = OffsetType::ZIPF;
 static uint64_t num_blocks = 1024 * 1024 * 1024 / 4096;  // 1 GB
-static uint64_t num_ops = 10'000'000;                    // 10M
+static uint64_t num_files = 32;
+static uint32_t num_blocks_per_op = 4;  // 16K read per op
+static uint64_t num_ops = 10'000'000;   // 10M
 static uint64_t preheat_num_ops = num_ops / 10;
 static double zipf_theta = 0.99;
 static uint64_t rand_seed = 0x537;  // enable different runs
-static uint64_t base_offset = 0;
+static uint64_t base_offset = 0;    // unit: blocks
+
+// a file owns a subspace of offset (unit: blocks)
+constexpr static uint64_t offset_subspace = 1UL << 30;
 
 static uint32_t cache_tick = num_blocks / 32;
 static uint32_t cache_min = cache_tick;
@@ -63,6 +68,10 @@ void parse_args(int argc, char* argv[]) {
       num_blocks = n / 4096;  // this is just a shortcut for num_blocks
     } else if (sscanf(argv[i], "--num_blocks=%ld%c", &n, &junk) == 1) {
       num_blocks = n;
+    } else if (sscanf(argv[i], "--num_files=%ld%c", &n, &junk) == 1) {
+      num_files = n;
+    } else if (sscanf(argv[i], "--num_blocks_per_op=%ld%c", &n, &junk) == 1) {
+      num_blocks_per_op = n;
     } else if (sscanf(argv[i], "--num_ops=%ld%c", &n, &junk) == 1) {
       num_ops = n;
       preheat_num_ops = num_ops / 10;
@@ -81,7 +90,7 @@ void parse_args(int argc, char* argv[]) {
     } else if (sscanf(argv[i], "--rand_seed=%ld%c", &n, &junk) == 1) {
       rand_seed = n;
       std::mt19937 rng(rand_seed + 0x564);
-      std::uniform_int_distribution<uint64_t> dist(0, 1UL << 31);
+      std::uniform_int_distribution<uint64_t> dist(0, offset_subspace);
       base_offset = dist(rng);
     } else {
       std::cerr << "Invalid argument: " << argv[i] << std::endl;
@@ -103,10 +112,11 @@ int main(int argc, char* argv[]) {
 
   // we dump all config and data into a csv file for parser
   std::ofstream ofs_perf(result_dir / "perf.csv");
-  ofs_perf << "workload,num_blocks,num_ops,zipf_theta,"
-              "cache_tick,cache_min,cache_max,sample_shift,rand_seed,"
-              "baseline_us,ghost_us,sampled_us,"
-              "ghost_cost_uspop,sampled_cost_uspop,avg_err,max_err\n";
+  ofs_perf
+      << "workload,num_blocks,num_files,num_blocks_per_op,num_ops,zipf_theta,"
+         "cache_tick,cache_min,cache_max,sample_shift,rand_seed,"
+         "baseline_us,ghost_us,sampled_us,"
+         "ghost_cost_uspop,sampled_cost_uspop,avg_err,max_err\n";
 
   std::cout << "Config: wl_type=";
   switch (wl_type) {
@@ -125,18 +135,27 @@ int main(int argc, char* argv[]) {
     default:
       throw std::runtime_error("Unimplemented offset wl_type");
   }
-  std::cout << ", num_blocks=" << num_blocks << ", num_ops=" << num_ops
-            << ", zipf_theta=" << zipf_theta << ", cache_tick=" << cache_tick
-            << ", cache_min=" << cache_min << ", cache_max=" << cache_max
-            << ", sample_shift=" << SAMPLE_SHIFT << ", rand_seed=" << rand_seed
-            << std::endl;
-  ofs_perf << ',' << num_blocks << ',' << num_ops << ',' << zipf_theta << ','
-           << cache_tick << ',' << cache_min << ',' << cache_max << ','
-           << SAMPLE_SHIFT << ',' << rand_seed;
+  std::cout << ", num_blocks=" << num_blocks << ", num_files=" << num_files
+            << ", num_blocks_per_op=" << num_blocks_per_op
+            << ", num_ops=" << num_ops << ", zipf_theta=" << zipf_theta
+            << ", cache_tick=" << cache_tick << ", cache_min=" << cache_min
+            << ", cache_max=" << cache_max << ", sample_shift=" << SAMPLE_SHIFT
+            << ", rand_seed=" << rand_seed << std::endl;
+  ofs_perf << ',' << num_blocks << ',' << num_files << ',' << num_blocks_per_op
+           << ',' << num_ops << ',' << zipf_theta << ',' << cache_tick << ','
+           << cache_min << ',' << cache_max << ',' << SAMPLE_SHIFT << ','
+           << rand_seed;
 
-  Offsets offsets1(num_ops, wl_type, num_blocks, 1, zipf_theta, rand_seed);
-  Offsets offsets2(num_ops, wl_type, num_blocks, 1, zipf_theta, rand_seed);
-  Offsets offsets3(num_ops, wl_type, num_blocks, 1, zipf_theta, rand_seed);
+  uint64_t num_blocks_per_file = num_blocks / num_files;
+  if (num_blocks_per_file >= offset_subspace)
+    throw std::runtime_error("num_blocks_per_file >= offset_subspace");
+
+  Offsets offsets1(num_ops, wl_type, /*size*/ num_blocks_per_file,
+                   /*align*/ num_blocks_per_op, zipf_theta, rand_seed);
+  Offsets offsets2(num_ops, wl_type, /*size*/ num_blocks_per_file,
+                   /*align*/ num_blocks_per_op, zipf_theta, rand_seed);
+  Offsets offsets3(num_ops, wl_type, /*size*/ num_blocks_per_file,
+                   /*align*/ num_blocks_per_op, zipf_theta, rand_seed);
 
   uint64_t offset_checksum1 = 0, offset_checksum2 = 0, offset_checksum3 = 0;
 
@@ -145,7 +164,9 @@ int main(int argc, char* argv[]) {
       cache_tick, cache_min, cache_max);
 
   // preheat: run a subset of stream to populate the cache
-  Offsets prehead_offsets(preheat_num_ops, wl_type, num_blocks, 1, zipf_theta,
+  Offsets prehead_offsets(preheat_num_ops, wl_type,
+                          /*size*/ num_blocks_per_file,
+                          /*align*/ num_blocks_per_op, zipf_theta,
                           /*seed*/ rand_seed + 0x736);
   auto preheat_begin_ts = std::chrono::high_resolution_clock::now();
   for (auto off : prehead_offsets) {
@@ -165,24 +186,43 @@ int main(int argc, char* argv[]) {
 
   // start benchmarking
   auto t0 = std::chrono::high_resolution_clock::now();
-  for (auto off : offsets1) {
-    // prevent compiler optimizing this out...)
-    offset_checksum1 ^= off;
+  {
+    uint64_t fd = 0;
+    for (auto off : offsets1) {
+      uint64_t begin_blk_id = fd * offset_subspace + base_offset + off;
+      for (uint32_t i = 0; i < num_blocks_per_op; ++i) {
+        uint64_t blk_id = begin_blk_id + i;
+        offset_checksum1 ^= blk_id;
+      }
+      fd = (fd + 1) % num_files;
+    }
   }
 
   auto t1 = std::chrono::high_resolution_clock::now();
   if (run_ghost) {
+    uint64_t fd = 0;
     for (auto off : offsets2) {
-      offset_checksum2 ^= off;
-      ghost_cache.access(off);
+      uint64_t begin_blk_id = fd * offset_subspace + base_offset + off;
+      for (uint32_t i = 0; i < num_blocks_per_op; ++i) {
+        uint64_t blk_id = begin_blk_id + i;
+        offset_checksum2 ^= blk_id;
+        ghost_cache.access(blk_id);
+      }
+      fd = (fd + 1) % num_files;
     }
   }
 
   auto t2 = std::chrono::high_resolution_clock::now();
   if (run_sampled) {
+    uint64_t fd = 0;
     for (auto off : offsets3) {
-      offset_checksum3 ^= off;
-      sampled_ghost_cache.access(off);
+      uint64_t begin_blk_id = fd * offset_subspace + base_offset + off;
+      for (uint32_t i = 0; i < num_blocks_per_op; ++i) {
+        uint64_t blk_id = begin_blk_id + i;
+        offset_checksum3 ^= blk_id;
+        sampled_ghost_cache.access(blk_id);
+      }
+      fd = (fd + 1) % num_files;
     }
   }
   auto t3 = std::chrono::high_resolution_clock::now();

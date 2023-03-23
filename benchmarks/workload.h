@@ -5,10 +5,6 @@
 #include <stdexcept>
 #include <vector>
 
-static off_t div_ceil(off_t a, off_t b) { return (a + b - 1) / b; }
-static off_t round_up(off_t a, off_t b) { return div_ceil(a, b) * b; }
-static off_t round_down(off_t a, off_t b) { return a - a % b; }
-
 enum class OffsetType { UNIF, ZIPF, SEQ };
 
 struct BaseGenerator {
@@ -20,59 +16,62 @@ struct BaseGenerator {
   void next() { index++; }
 };
 
-struct SeqGenerator : public BaseGenerator {
-  const off_t min;
-  const size_t repeat;
-  const off_t align;
+struct AlignGenerator : public BaseGenerator {
+  const off_t min_;
+  const off_t align_;
+  /* We force min and max must be aligned.
+   * This also ensure [output, output + align - 1] is also safe (i.e. < max)
+   */
+  AlignGenerator(off_t min, off_t max, off_t align) : min_(min), align_(align) {
+    if (min % align != 0) throw std::runtime_error("min is not aligned!");
+    if (max % align != 0) throw std::runtime_error("max is not aligned!");
+  }
+  off_t map(off_t x) { return min_ + align_ * x; }
+};
+
+struct SeqGenerator : public AlignGenerator {
+  off_t n_;
   SeqGenerator(off_t min, off_t max, off_t align)
-      : min(round_up(min, align)),
-        repeat((round_down(max - 1, align) - round_up(min, align)) / align + 1),
-        align(align) {}
-  off_t get() { return min + index % repeat * align; }
+      : AlignGenerator(min, max, align), n_((max - min) / align) {}
+  off_t get() override { return map(index % n_); }
 };
 
-struct UnifGenerator : public BaseGenerator {
+struct UnifGenerator : public AlignGenerator {
   std::mt19937 rng;
-  std::uniform_int_distribution<off_t> dist;
-  const off_t align;
+  std::uniform_int_distribution<off_t> dist; /* inclusive */
   UnifGenerator(off_t min, off_t max, off_t align, uint64_t seed)
-      : rng(seed),
-        dist(div_ceil(min, align), (max - 1) / align),
-        align(align) {}
-  off_t get() { return dist(rng) * align; }
+      : AlignGenerator(min, max, align),
+        rng(seed),
+        dist(0, (max - min) / align - 1) {}
+  off_t get() override { return map(dist(rng)); }
 };
 
-struct ZipfGenerator : public BaseGenerator {
-  std::mt19937_64 rng;
-  std::uniform_real_distribution<double> dist{0, 1};
-  const off_t align;
-  const double theta;
-  const uint64_t n;
-  const off_t min;
-  const double denom;
-  const double eta;
-  ZipfGenerator(off_t min, off_t max, double theta, off_t align, uint64_t seed)
-      : rng(seed),
-        align(align),
-        theta(theta),
-        n((max - min) / align),
-        min(round_up(min, align)),
-        denom(zeta(n, theta)),
-        eta((1 - std::pow(2.0 / n, 1 - theta)) / (1 - zeta(2, theta) / denom)) {
-  }
-  off_t get() {
-    double u = dist(rng);
-    double uz = u * denom;
-    if (uz < 1.0) {
-      return min;
-    } else if (uz < 1.0 + std::pow(0.5, theta)) {
-      return min + align;
-    } else {
-      double alpha = 1.0 / (1.0 - theta);
-      return min + align * uint64_t(n * std::pow(eta * u - eta + 1, alpha));
-    }
-  }
+struct ZipfGenerator : public AlignGenerator {
+  std::mt19937 rng;
+  std::uniform_real_distribution<double> dist{0.0, 1.0};
+  const double theta_;
+  const uint64_t n_;
+  const double denom_;
+  const double eta_;
+  const double alpha_;
+  // NOTE: member order matters: variable must be init in order!
 
+  ZipfGenerator(off_t min, off_t max, double theta, off_t align, uint64_t seed)
+      : AlignGenerator(min, max, align),
+        rng(seed),
+        theta_(theta),
+        n_((max - min) / align),
+        denom_(zeta(n_, theta)),
+        eta_((1 - std::pow(2.0 / n_, 1 - theta)) /
+             (1 - zeta(2, theta) / denom_)),
+        alpha_(1.0 / (1.0 - theta)) {}
+  off_t get() override {
+    double u = dist(rng);
+    double uz = u * denom_;
+    if (uz < 1.0) return map(0);
+    if (uz < 1.0 + std::pow(0.5, theta_)) return map(1);
+    return map(n_ * std::pow(eta_ * u - eta_ + 1, alpha_));
+  }
   static double zeta(uint64_t n, double theta) {
     double sum = 0;
     for (uint64_t i = 1; i <= n; i++) sum += std::pow(1.0 / i, theta);
@@ -117,11 +116,11 @@ struct Offsets {
                                       uint64_t seed) {
     switch (type) {
       case OffsetType::SEQ:
-        return new SeqGenerator(0, size - 1, align);
+        return new SeqGenerator(0, size, align);
       case OffsetType::UNIF:
-        return new UnifGenerator(0, size - 1, align, seed);
+        return new UnifGenerator(0, size, align, seed);
       case OffsetType::ZIPF:
-        return new ZipfGenerator(0, size - 1, zipf_theta, align, seed);
+        return new ZipfGenerator(0, size, zipf_theta, align, seed);
       default:
         throw std::runtime_error("Unimplemented offset type");
     }

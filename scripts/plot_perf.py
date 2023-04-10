@@ -1,5 +1,6 @@
 import pandas as pd
 import math
+import matplotlib
 import matplotlib.pyplot as plt
 from typing import List, Tuple
 from plot_util import *
@@ -7,8 +8,13 @@ from plot_util import *
 results_dir = "results"
 sample_shift_list = [3, 4, 5, 6, 7, 8]
 
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 if __name__ == "__main__":
     fig, (ax_err, ax_cost) = get_subplots(nrows=1, ncols=2)
+    ax_err.spines[['right', 'top']].set_visible(False)
+    ax_cost.spines[['right', 'top']].set_visible(False)
     df_mean = pd.read_csv(f"{results_dir}/perf_mean.csv",
                           header=0,
                           index_col=False)

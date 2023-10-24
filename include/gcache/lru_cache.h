@@ -52,6 +52,7 @@ class LRUCache {
   template <typename Fn>
   void init(size_t capacity, Fn&& fn);
 
+  size_t size() const { return size_; }
   size_t capacity() const { return capacity_; }
 
   // For each item in the cache, call fn(key, handle)
@@ -139,6 +140,9 @@ class LRUCache {
   // after LRU (usually it's e->next)
   Node_t* lru_refresh(Node_t* e);
 
+  // Number of Node inserted (i.e. in table_).
+  size_t size_;
+
   // Initialized before use.
   size_t capacity_;
 
@@ -188,7 +192,7 @@ class LRUCache {
 
 template <typename Key_t, typename Value_t, typename Hash>
 inline LRUCache<Key_t, Value_t, Hash>::LRUCache()
-    : capacity_(0), pool_(nullptr), table_(nullptr) {
+    : size_(0), capacity_(0), pool_(nullptr), table_(nullptr) {
   // Make empty circular linked lists.
   lru_.next = &lru_;
   lru_.prev = &lru_;
@@ -305,6 +309,7 @@ LRUCache<Key_t, Value_t, Hash>::insert_impl(Key_t key, uint32_t hash, bool pin,
   } else {
     list_append(&lru_, e);
   }
+  ++size_;
   return e;
 }
 
@@ -386,6 +391,7 @@ LRUCache<Key_t, Value_t, Hash>::refresh(Key_t key, uint32_t hash,
   table_->insert(e);
   assert(e->refs == 1);
   list_append(&lru_, e);
+  ++size_;
   return e;
 }
 
@@ -402,6 +408,7 @@ inline bool LRUCache<Key_t, Value_t, Hash>::erase(Handle_t handle) {
   [[maybe_unused]] Node_t* e_;
   e_ = table_->remove(e->key, e->hash);
   assert(e_ == e);
+  --size_;
   --capacity_;
   return true;
 }
@@ -426,6 +433,7 @@ LRUCache<Key_t, Value_t, Hash>::install_impl(Key_t key) {
   e->init(key, Hash{}(key));
   table_->insert(e);
   list_append(&lru_, e);
+  ++size_;
   ++capacity_;
   return e;
 }
@@ -447,6 +455,7 @@ LRUCache<Key_t, Value_t, Hash>::alloc_node() {
   [[maybe_unused]] Node_t* e_;
   e_ = table_->remove(e->key, e->hash);
   assert(e_ == e);
+  --size_;
   return e;
 }
 

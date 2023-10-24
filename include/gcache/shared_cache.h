@@ -68,6 +68,7 @@ class SharedCache {
 
  public:
   using Handle_t = TaggedHandle<Tag_t, Key_t, Value_t>;
+  using LRUCache_t = LRUCache<Key_t, TaggedValue_t, Hash>;
 
   SharedCache() : pool_(nullptr), table_(), tenant_cache_map_(){};
   ~SharedCache() { delete[] pool_; };
@@ -119,7 +120,7 @@ class SharedCache {
   Handle_t install(Tag_t tag, Key_t key);
 
   // Return a read-only access to the LRU cache associated with the tag
-  const LRUCache<Key_t, TaggedValue_t, Hash>& get_cache(Tag_t tag);
+  const LRUCache_t& get_cache(Tag_t tag);
 
  private:
   Node_t* lookup_impl(Key_t key, uint32_t hash, bool pin);
@@ -129,8 +130,7 @@ class SharedCache {
   NodeTable<Key_t, TaggedValue_t> table_;
 
   // Map each tenant's tag to its own cache; must be const after `init`
-  std::unordered_map<Tag_t, LRUCache<Key_t, TaggedValue_t, Hash>>
-      tenant_cache_map_;
+  std::unordered_map<Tag_t, LRUCache_t> tenant_cache_map_;
 
  public:  // for debugging
   std::ostream& print(std::ostream& os, int indent = 0) const;
@@ -271,9 +271,7 @@ SharedCache<Tag_t, Key_t, Value_t, Hash>::install(Tag_t tag, Key_t key) {
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
-inline const LRUCache<
-    Key_t, typename SharedCache<Tag_t, Key_t, Value_t, Hash>::TaggedValue_t,
-    Hash>&
+inline const typename SharedCache<Tag_t, Key_t, Value_t, Hash>::LRUCache_t&
 SharedCache<Tag_t, Key_t, Value_t, Hash>::get_cache(Tag_t tag) {
   assert(tenant_cache_map_.contains(tag));
   return tenant_cache_map_[tag];

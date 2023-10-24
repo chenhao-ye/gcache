@@ -89,6 +89,9 @@ class SharedCache {
   template <typename Fn>
   void for_each(Fn&& fn);
 
+  // For all APIs taking a tag as input, the tag must be valid (i.e., exists in
+  // tenant_configs); the behavior is undefined if not.
+
   // Insert a handle into cache with given key and hash if not exists; if does,
   // return the existing one
   Handle_t insert(Tag_t tag, Key_t key, bool pin = false,
@@ -114,6 +117,9 @@ class SharedCache {
   // Similar to LRUCache erase/install
   bool erase(Handle_t handle);
   Handle_t install(Tag_t tag, Key_t key);
+
+  // Return a read-only access to the LRU cache associated with the tag
+  const LRUCache<Key_t, TaggedValue_t, Hash>& get_cache(Tag_t tag);
 
  private:
   Node_t* lookup_impl(Key_t key, uint32_t hash, bool pin);
@@ -262,6 +268,15 @@ SharedCache<Tag_t, Key_t, Value_t, Hash>::install(Tag_t tag, Key_t key) {
   Handle_t h(e);
   h.set_tag(tag);
   return h;
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline const LRUCache<
+    Key_t, typename SharedCache<Tag_t, Key_t, Value_t, Hash>::TaggedValue_t,
+    Hash>&
+SharedCache<Tag_t, Key_t, Value_t, Hash>::get_cache(Tag_t tag) {
+  assert(tenant_cache_map_.contains(tag));
+  return tenant_cache_map_[tag];
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>

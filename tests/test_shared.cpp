@@ -18,6 +18,9 @@ void test1() {
 
   shared_cache.init(tenant_configs);
 
+  [[maybe_unused]] auto& cache_537 = shared_cache.get_cache(537);
+  [[maybe_unused]] auto& cache_564 = shared_cache.get_cache(564);
+
   auto h = shared_cache.insert(537, 1, true);
   assert(h);
   *h = 111;
@@ -28,8 +31,9 @@ void test1() {
   h = shared_cache.insert(537, 3, false);
   assert(h);
   *h = 333;
-
-  std::cout << "Expect: { 564: [2], 537: [1, 3]}" << std::endl;
+  assert(cache_537.size() == 2);
+  assert(cache_564.size() == 1);
+  std::cout << "Expect: { 537: [1, 3], 564: [2] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
   h = shared_cache.insert(564, 4, false);
@@ -38,7 +42,9 @@ void test1() {
   h = shared_cache.insert(537, 5, false);
   assert(h);
   *h = 555;
-  std::cout << "Expect: { 564: [2, 4], 537: [1, 3, 5] }" << std::endl;
+  assert(cache_537.size() == 3);
+  assert(cache_564.size() == 2);
+  std::cout << "Expect: { 537: [1, 3, 5], 564: [2, 4] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
   h = shared_cache.insert(564, 6, false);
@@ -47,7 +53,9 @@ void test1() {
   h = shared_cache.insert(537, 2, false);
   assert(h);
   *h = 2222;
-  std::cout << "Expect: { 564: [4, 6], 537: [3, 5, 2] }" << std::endl;
+  assert(cache_537.size() == 3);
+  assert(cache_564.size() == 2);
+  std::cout << "Expect: {  537: [3, 5, 2], 564: [4, 6] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
   // try to access a handle already in the other tenant's cache
@@ -55,11 +63,15 @@ void test1() {
   h = shared_cache.insert(564, 2, false);
   assert(h);
   *h = 22222;
-  std::cout << "Expect: { 564: [4, 6], 537: [3, 5, 2] }" << std::endl;
+  assert(cache_537.size() == 3);
+  assert(cache_564.size() == 2);
+  std::cout << "Expect: { 537: [3, 5, 2], 564: [4, 6] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
   shared_cache.relocate(537, 564, 2);
-  std::cout << "Expect: { 564: [4, 6], 537: [2] }" << std::endl;
+  assert(cache_537.size() == 1);
+  assert(cache_564.size() == 2);
+  std::cout << "Expect: { 537: [2], 564: [4, 6] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
   h = shared_cache.insert(564, 7, false);
@@ -68,26 +80,34 @@ void test1() {
   h = shared_cache.insert(564, 8, false);
   assert(h);
   *h = 888;
-  std::cout << "Expect: { 564: [4, 6, 7, 8], 537: [2] }" << std::endl;
+  assert(cache_537.size() == 1);
+  assert(cache_564.size() == 4);
+  std::cout << "Expect: { 537: [2], 564: [4, 6, 7, 8] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
   h = shared_cache.insert(564, 9, false);
   assert(h);
   *h = 999;
-  std::cout << "Expect: { 564: [6, 7, 8, 9], 537: [2] }" << std::endl;
+  assert(cache_537.size() == 1);
+  assert(cache_564.size() == 4);
+  std::cout << "Expect: { 537: [2], 564: [6, 7, 8, 9]}" << std::endl;
   std::cout << shared_cache << std::endl;
 
   // test erase/install
   [[maybe_unused]] bool success = shared_cache.erase(h);
   assert(success);
-  std::cout << "Expect: { 564: [6, 7, 8], 537: [2] }" << std::endl;
+  assert(cache_537.size() == 1);
+  assert(cache_564.size() == 3);
+  std::cout << "Expect: { 537: [2], 564: [6, 7, 8] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
   // setting values is skipped...
   shared_cache.install(537, 10);
   shared_cache.install(537, 11);
   shared_cache.install(564, 12);
-  std::cout << "Expect: { 564: [6, 7, 8, 12], 537: [2, 10, 11] }" << std::endl;
+  assert(cache_537.size() == 3);
+  assert(cache_564.size() == 4);
+  std::cout << "Expect: { 537: [2, 10, 11], 564: [6, 7, 8, 12] }" << std::endl;
   std::cout << shared_cache << std::endl;
 }
 

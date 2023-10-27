@@ -20,6 +20,7 @@ void test() {
   LRUCache<uint32_t, uint32_t, hash1> cache;
   cache.init(4);
   assert(cache.size() == 0);
+  assert(cache.capacity() == 4);
 
   auto h1 = cache.insert(1, true);
   assert(h1);
@@ -129,6 +130,7 @@ void test() {
   bool success = cache.erase(h7);
   assert(success);
   assert(cache.size() == 3);
+  assert(cache.capacity() == 3);
   std::cout << "\n=== Expect: lru: [3, 6, 5], in_use: [] ===\n";
   std::cout << cache;
 
@@ -149,6 +151,7 @@ void test() {
   auto h9 = cache.install(9);
   assert(h9);
   assert(cache.size() == 4);
+  assert(cache.capacity() == 4);
   *h9 = 999;
   std::cout << "\n=== Expect: lru: [5, 8, 9], in_use: [6] ===\n";
   std::cout << cache;

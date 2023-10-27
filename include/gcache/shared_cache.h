@@ -83,8 +83,14 @@ class SharedCache {
             Fn&& fn);
 
   size_t capacity() const { return total_capacity_; }
+  // Note no `size()` is provided here, because it is unclear how useful to know
+  // the overall size instead of each individual LRU cache's size, and it is
+  // more complicated to maintain
+
   // Return the current cache capacity associated with the given tag
   size_t capacity_of(Tag_t tag) const;
+  // Return the current cache size associated with the given tag
+  size_t size_of(Tag_t tag) const;
 
   // For each item in the cache, call fn(key, handle)
   template <typename Fn>
@@ -120,10 +126,12 @@ class SharedCache {
   Handle_t install(Tag_t tag, Key_t key);
 
   // Return a read-only access to the LRU cache associated with the tag
-  const LRUCache_t& get_cache(Tag_t tag);
+  const LRUCache_t& get_cache(Tag_t tag) const;
 
  private:
   Node_t* lookup_impl(Key_t key, uint32_t hash, bool pin);
+
+  LRUCache_t& get_cache_mutable(Tag_t tag);
 
   Node_t* pool_;
   size_t total_capacity_;
@@ -149,7 +157,11 @@ void SharedCache<Tag_t, Key_t, Value_t, Hash>::init(
   table_.init(total_capacity_);
   pool_ = new Node_t[total_capacity_];
   for (auto [tag, capacity] : tenant_configs) {
-    tenant_cache_map_[tag].init_from(&pool_[begin_idx], &table_, capacity);
+    auto [it, is_emplaced] = tenant_cache_map_.emplace(
+        std::piecewise_construct, std::forward_as_tuple(tag),
+        std::forward_as_tuple());
+    assert(is_emplaced);
+    it->second.init_from(&pool_[begin_idx], &table_, capacity);
     begin_idx += capacity;
   }
   assert(begin_idx == total_capacity_);
@@ -168,7 +180,13 @@ inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::init(
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::capacity_of(Tag_t tag) const {
   assert(tenant_cache_map_.contains(tag));
-  return tenant_cache_map_.find(tag)->second.capacity();
+  return get_cache(tag).capacity();
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::size_of(Tag_t tag) const {
+  assert(tenant_cache_map_.contains(tag));
+  return get_cache(tag).size();
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
@@ -195,7 +213,7 @@ SharedCache<Tag_t, Key_t, Value_t, Hash>::insert(Tag_t tag, Key_t key, bool pin,
   }
 
   // The key does not exist in the cache, perform insertion
-  e = tenant_cache_map_[tag].insert_impl(key, hash, pin, /*not_exist*/ true);
+  e = get_cache_mutable(tag).insert_impl(key, hash, pin, /*not_exist*/ true);
   if (!e) return nullptr;
   Handle_t h(e);
   h.set_tag(tag);
@@ -217,7 +235,7 @@ SharedCache<Tag_t, Key_t, Value_t, Hash>::lookup_impl(Key_t key, uint32_t hash,
 
   Tag_t tag = Handle_t(e).get_tag();
   assert(tenant_cache_map_.contains(tag));
-  tenant_cache_map_[tag].lookup_refresh(e, pin);
+  get_cache_mutable(tag).lookup_refresh(e, pin);
   return e;
 }
 
@@ -225,7 +243,7 @@ template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::release(Handle_t handle) {
   Tag_t tag = handle.get_tag();
   assert(tenant_cache_map_.contains(tag));
-  tenant_cache_map_[tag].release(handle.untagged());
+  get_cache_mutable(tag).release(handle.untagged());
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
@@ -233,7 +251,7 @@ inline void SharedCache<Tag_t, Key_t, Value_t, Hash>::pin(
     typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t handle) {
   Tag_t tag = handle.get_tag();
   assert(tenant_cache_map_.contains(tag));
-  tenant_cache_map_[tag].pin(handle.untagged());
+  get_cache_mutable(tag).pin(handle.untagged());
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
@@ -257,24 +275,34 @@ inline size_t SharedCache<Tag_t, Key_t, Value_t, Hash>::relocate(Tag_t src,
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 inline bool SharedCache<Tag_t, Key_t, Value_t, Hash>::erase(Handle_t handle) {
   assert(tenant_cache_map_.contains(handle.get_tag()));
-  return tenant_cache_map_[handle.get_tag()].erase(handle.untagged());
+  bool is_erased = tenant_cache_map_[handle.get_tag()].erase(handle.untagged());
+  if (is_erased) --total_capacity_;
+  return is_erased;
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::Handle_t
 SharedCache<Tag_t, Key_t, Value_t, Hash>::install(Tag_t tag, Key_t key) {
   assert(tenant_cache_map_.contains(tag));
-  Node_t* e = tenant_cache_map_[tag].install_impl(key);
+  Node_t* e = get_cache_mutable(tag).install_impl(key);
   Handle_t h(e);
   h.set_tag(tag);
+  ++total_capacity_;
   return h;
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 inline const typename SharedCache<Tag_t, Key_t, Value_t, Hash>::LRUCache_t&
-SharedCache<Tag_t, Key_t, Value_t, Hash>::get_cache(Tag_t tag) {
+SharedCache<Tag_t, Key_t, Value_t, Hash>::get_cache(Tag_t tag) const {
   assert(tenant_cache_map_.contains(tag));
-  return tenant_cache_map_[tag];
+  return tenant_cache_map_.find(tag)->second;
+}
+
+template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
+inline typename SharedCache<Tag_t, Key_t, Value_t, Hash>::LRUCache_t&
+SharedCache<Tag_t, Key_t, Value_t, Hash>::get_cache_mutable(Tag_t tag) {
+  assert(tenant_cache_map_.contains(tag));
+  return tenant_cache_map_.find(tag)->second;
 }
 
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>

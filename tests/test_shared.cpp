@@ -17,9 +17,14 @@ void test1() {
   tenant_configs.emplace_back(564, 2);
 
   shared_cache.init(tenant_configs);
+  assert(shared_cache.capacity() == 5);
+  assert(shared_cache.size_of(537) == 0);
+  assert(shared_cache.size_of(564) == 0);
 
   [[maybe_unused]] auto& cache_537 = shared_cache.get_cache(537);
   [[maybe_unused]] auto& cache_564 = shared_cache.get_cache(564);
+  assert(cache_537.size() == 0);
+  assert(cache_564.size() == 0);
 
   auto h = shared_cache.insert(537, 1, true);
   assert(h);
@@ -98,6 +103,9 @@ void test1() {
   assert(success);
   assert(cache_537.size() == 1);
   assert(cache_564.size() == 3);
+  assert(shared_cache.size_of(537) == 1);
+  assert(shared_cache.size_of(564) == 3);
+  assert(shared_cache.capacity() == 4);
   std::cout << "Expect: { 537: [2], 564: [6, 7, 8] }" << std::endl;
   std::cout << shared_cache << std::endl;
 
@@ -107,6 +115,9 @@ void test1() {
   shared_cache.install(564, 12);
   assert(cache_537.size() == 3);
   assert(cache_564.size() == 4);
+  assert(shared_cache.size_of(537) == 3);
+  assert(shared_cache.size_of(564) == 4);
+  assert(shared_cache.capacity() == 7);
   std::cout << "Expect: { 537: [2, 10, 11], 564: [6, 7, 8, 12] }" << std::endl;
   std::cout << shared_cache << std::endl;
 }

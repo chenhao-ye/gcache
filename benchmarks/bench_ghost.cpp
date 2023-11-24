@@ -111,8 +111,7 @@ int main(int argc, char* argv[]) {
   ofs_perf
       << "workload,num_blocks,num_files,num_blocks_per_op,num_ops,zipf_theta,"
          "cache_tick,cache_min,cache_max,sample_shift,rand_seed,"
-         "baseline_us,ghost_us,sampled_us,"
-         "ghost_cost_uspop,sampled_cost_uspop,avg_err,max_err\n";
+         "baseline_us,ghost_us,sampled_us,avg_err,max_err\n";
 
   std::cout << "Config: wl_type=";
   switch (wl_type) {
@@ -230,7 +229,7 @@ int main(int argc, char* argv[]) {
   }
   auto t3 = std::chrono::high_resolution_clock::now();
 
-  uint64_t t_base = 0, t_ghost = 0, t_sampled = 0;
+  int64_t t_base = 0, t_ghost = 0, t_sampled = 0;
   double ghost_overhead = 0, sampled_overhead = 0;
   t_base =
       std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
@@ -250,8 +249,7 @@ int main(int argc, char* argv[]) {
   std::cout << "Sampled Ghost Cache: " << t_sampled << " us\n";
   std::cout << "Ghost Overhead:      " << ghost_overhead << " us/op\n";
   std::cout << "Sampled Overhead:    " << sampled_overhead << " us/op\n";
-  ofs_perf << ',' << t_base << ',' << t_ghost << ',' << t_sampled << ','
-           << ghost_overhead << ',' << sampled_overhead;
+  ofs_perf << ',' << t_base << ',' << t_ghost << ',' << t_sampled;
 
   double avg_err = 0, max_err = 0;
 

@@ -15,11 +15,11 @@ plt.rcParams['ytick.major.size'] = '2.5'
 plt.rcParams['axes.labelpad'] = '1'
 
 color_map = {
-    "zipf_s1G_z0.99": "#2c7bb6",
-    "unif_s1G": "#abdda4",
-    "zipf_s2G_z0.5": "#abd9e9",
-    "unif_s0.5G": "darkgreen",
-    "unif_s0.7G": "forestgreen",
+    "zipf_s1G_z0.99": "0",
+    "unif_s1G": "0.6",
+    "zipf_s2G_z0.5": "0.8",
+    "unif_s0.5G": "0.4",
+    "unif_s0.7G": "0.2",
 }
 
 marker_map = {
@@ -30,8 +30,8 @@ marker_map = {
 
 linestyle_map = {
     "zipf_s1G_z0.99": "-",
-    "unif_s1G": "--",
-    "zipf_s2G_z0.5": "-.",
+    "unif_s1G": "-",
+    "zipf_s2G_z0.5": "-",
     "unif_s0.5G": ":",
     "unif_s0.7G": "-.",
 }

@@ -26,7 +26,7 @@ for sr in 3 4 5 6 7 8; do
 	cd ..
 done
 
-for seed in {0..1000}; do  # 1000 times
+for seed in {0..999}; do  # 1000 times
 	for sr in 3 4 5 6 7 8; do
 		echo "Run with sample rate: ${sr}, seed=${seed}"
 		run_cmd zipf 1073741824 0.99 zipf_s1G_z0.99 ${seed}

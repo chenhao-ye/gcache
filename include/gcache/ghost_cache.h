@@ -77,7 +77,14 @@ class GhostCache {
   std::vector<Node_t*> size_boundaries;
   std::vector<CacheStat> caches_stat;
 
-  void access_impl(uint32_t block_id, uint32_t hash);
+  // AccessMode controls the behavior to update cache stat
+  enum AccessMode : uint8_t {
+    DEFAULT,  // update normally
+    AS_MISS,  // consider it as a miss for all cache sizes
+    AS_HIT,   // consider it as a hit for all cache sizes
+    NOOP,     // do not update
+  };
+  void access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
 
  public:
   GhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
@@ -94,7 +101,9 @@ class GhostCache {
     assert(min_size + (num_ticks - 1) * tick == max_size);
     cache.init(max_size);
   }
-  void access(uint32_t block_id) { access_impl(block_id, ghash{}(block_id)); }
+  void access(uint32_t block_id, AccessMode mode = AccessMode::DEFAULT) {
+    access_impl(block_id, ghash{}(block_id), mode);
+  }
 
   [[nodiscard]] uint32_t get_tick() const { return tick; }
   [[nodiscard]] uint32_t get_min_size() const { return min_size; }
@@ -141,9 +150,9 @@ class SampledGhostCache : public GhostCache {
   }
 
   // Only update ghost cache if the first few bits of hash is all zero
-  void access(uint32_t block_id) {
+  void access(uint32_t block_id, AccessMode mode = AccessMode::DEFAULT) {
     uint32_t hash = ghash{}(block_id);
-    if ((hash >> (32 - SampleShift)) == 0) access_impl(block_id, hash);
+    if ((hash >> (32 - SampleShift)) == 0) access_impl(block_id, hash, mode);
   }
 
   uint32_t get_tick() const { return tick << SampleShift; }
@@ -168,7 +177,8 @@ class SampledGhostCache : public GhostCache {
 /**
  * When using ghost cache, we assume in_use list is always empty.
  */
-inline void GhostCache::access_impl(uint32_t block_id, uint32_t hash) {
+inline void GhostCache::access_impl(uint32_t block_id, uint32_t hash,
+                                    AccessMode mode) {
   uint32_t size_idx;
   Handle_t s;  // successor
   Handle_t h = cache.refresh(block_id, hash, s);
@@ -210,11 +220,24 @@ inline void GhostCache::access_impl(uint32_t block_id, uint32_t hash) {
     b->value++;
     b = b->next;
   }
-  if (s) {
-    for (uint32_t i = 0; i < size_idx; ++i) caches_stat[i].add_miss();
-    for (uint32_t i = size_idx; i < num_ticks; ++i) caches_stat[i].add_hit();
-  } else {
-    for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_miss();
+  switch (mode) {
+    case AccessMode::DEFAULT:
+      if (s) {
+        for (uint32_t i = 0; i < size_idx; ++i) caches_stat[i].add_miss();
+        for (uint32_t i = size_idx; i < num_ticks; ++i)
+          caches_stat[i].add_hit();
+      } else {
+        for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_miss();
+      }
+      break;
+    case AccessMode::AS_MISS:
+      for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_miss();
+      break;
+    case AccessMode::AS_HIT:
+      for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_hit();
+      break;
+    case AccessMode::NOOP:
+      break;
   }
 
   *h = 0;

@@ -24,21 +24,38 @@ void test1() {
   ghost_cache.access(1);
   ghost_cache.access(2);
   ghost_cache.access(3);
-  std::cout
-      << "Expect: Boundaries: [1, 0, (null), (null)]; Stat: [0/4, 0/4, 0/4]\n";
+  std::cout << "Expect: Boundaries: [1, 0, (null), (null)]; "
+               "Stat: [0/4, 0/4, 0/4, 0/4]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(4);
   ghost_cache.access(5);
-  std::cout << "Expect: Boundaries: [3, 2, 1, 0]; Stat: [0/6, 0/6, 0/6]\n";
+  std::cout << "Expect: Boundaries: [3, 2, 1, 0]; Stat: [0/6, 0/6, 0/6, 0/6]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(2);
-  std::cout << "Expect: Boundaries: [4, 3, 1, 0]; Stat: [0/7, 1/7, 1/7]\n";
+  std::cout << "Expect: Boundaries: [4, 3, 1, 0]; Stat: [0/7, 1/7, 1/7, 1/7]\n";
   std::cout << ghost_cache;
 
   ghost_cache.access(4);
-  std::cout << "Expect: Boundaries: [5, 3, 1, 0]; Stat: [1/8, 2/8, 2/8]\n";
+  std::cout << "Expect: Boundaries: [5, 3, 1, 0]; Stat: [1/8, 2/8, 2/8, 2/8]\n";
+  std::cout << ghost_cache;
+  std::cout << std::flush;
+
+  ghost_cache.access(2, AccessMode::AS_MISS);
+  std::cout << "Expect: Boundaries: [5, 3, 1, 0]; Stat: [1/9, 2/9, 2/9, 2/9]\n";
+  std::cout << ghost_cache;
+  std::cout << std::flush;
+
+  ghost_cache.access(0, AccessMode::AS_HIT);
+  std::cout
+      << "Expect: Boundaries: [4, 5, 3, 1]; Stat: [2/10, 3/10, 3/10, 3/10]\n";
+  std::cout << ghost_cache;
+  std::cout << std::flush;
+
+  ghost_cache.access(7, AccessMode::NOOP);
+  std::cout
+      << "Expect: Boundaries: [2, 4, 5, 3]; Stat: [2/10, 3/10, 3/10, 3/10]\n";
   std::cout << ghost_cache;
   std::cout << std::flush;
 }
@@ -70,6 +87,21 @@ void test2() {
 
   ghost_cache.access(4);
   std::cout << "Expect: Boundaries: [1, 6, 3]; Stat: [0/10, 0/10, 1/10]\n";
+  std::cout << ghost_cache;
+  std::cout << std::flush;
+
+  ghost_cache.access(8, AccessMode::NOOP);
+  std::cout << "Expect: Boundaries: [4, 7, 5]; Stat: [0/10, 0/10, 1/10]\n";
+  std::cout << ghost_cache;
+  std::cout << std::flush;
+
+  ghost_cache.access(9, AccessMode::AS_HIT);
+  std::cout << "Expect: Boundaries: [8, 1, 6]; Stat: [1/11, 1/11, 2/11]\n";
+  std::cout << ghost_cache;
+  std::cout << std::flush;
+
+  ghost_cache.access(1, AccessMode::AS_MISS);
+  std::cout << "Expect: Boundaries: [9, 4, 6]; Stat: [1/12, 1/12, 2/12]\n";
   std::cout << ghost_cache;
   std::cout << std::flush;
 }

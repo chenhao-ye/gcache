@@ -15,6 +15,14 @@
 
 namespace gcache {
 
+// AccessMode controls the behavior to update cache stat
+enum AccessMode : uint8_t {
+  DEFAULT,  // update normally
+  AS_MISS,  // consider it as a miss for all cache sizes
+  AS_HIT,   // consider it as a hit for all cache sizes
+  NOOP,     // do not update
+};
+
 struct CacheStat {
   uint64_t hit_cnt;
   uint64_t miss_cnt;
@@ -77,13 +85,6 @@ class GhostCache {
   std::vector<Node_t*> size_boundaries;
   std::vector<CacheStat> caches_stat;
 
-  // AccessMode controls the behavior to update cache stat
-  enum AccessMode : uint8_t {
-    DEFAULT,  // update normally
-    AS_MISS,  // consider it as a miss for all cache sizes
-    AS_HIT,   // consider it as a hit for all cache sizes
-    NOOP,     // do not update
-  };
   void access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
 
  public:

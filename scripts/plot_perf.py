@@ -89,7 +89,8 @@ def plot(df_mean: pd.DataFrame, df_std: pd.DataFrame):
     plt.close(fig)
 
     print("Save legend as `ghost_perf_legend.pdf`")
-    legend_fig = make_legend(["zipf_s1G_z0.99", "unif_s1G", "zipf_s2G_z0.5"])
+    legend_fig = make_legend(["unif_s1G", "zipf_s1G_z0.99", "zipf_s2G_z0.5"],
+                             width=5.5)
 
     print("Legend saved to `ghost_perf_legend.png`")
     legend_fig.savefig("ghost_perf_legend.png")

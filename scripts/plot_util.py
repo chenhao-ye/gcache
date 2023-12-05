@@ -15,8 +15,8 @@ plt.rcParams['ytick.major.size'] = '2.5'
 plt.rcParams['axes.labelpad'] = '1'
 
 color_map = {
-    "zipf_s1G_z0.99": "0",
-    "unif_s1G": "0.6",
+    "zipf_s1G_z0.99": "0.5",
+    "unif_s1G": "0",
     "zipf_s2G_z0.5": "0.8",
     "unif_s0.5G": "0.4",
     "unif_s0.7G": "0.2",
@@ -37,11 +37,11 @@ linestyle_map = {
 }
 
 label_map = {
-    "zipf_s1G_z0.99": "Tenant X",
-    "unif_s1G": "Tenant U (1GB)",
-    "zipf_s2G_z0.5": "Tenant Z (theta 0.5)",
-    "unif_s0.5G": "Tenant U (0.5GB)",
-    "unif_s0.7G": "Tenant U (0.7GB)",
+    "zipf_s1G_z0.99": "Zipf (theta 0.99), 1GB",
+    "unif_s1G": "Unif, 1GB",
+    "zipf_s2G_z0.5": "Zipf (theta 0.5), 2GB",
+    "unif_s0.5G": "Unif, 0.5GB",
+    "unif_s0.7G": "Unif, 0.7GB",
 }
 
 

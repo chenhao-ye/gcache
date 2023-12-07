@@ -37,9 +37,9 @@ linestyle_map = {
 }
 
 label_map = {
-    "zipf_s1G_z0.99": "Zipf (theta 0.99), 1GB",
+    "zipf_s1G_z0.99": "Zipf-0.99, 1GB",
     "unif_s1G": "Unif, 1GB",
-    "zipf_s2G_z0.5": "Zipf (theta 0.5), 2GB",
+    "zipf_s2G_z0.5": "Zipf-0.5, 2GB",
     "unif_s0.5G": "Unif, 0.5GB",
     "unif_s0.7G": "Unif, 0.7GB",
 }

@@ -41,6 +41,13 @@ struct CacheStat {
     if (acc_cnt == 0) return std::numeric_limits<double>::infinity();
     return double(hit_cnt) / double(acc_cnt);
   }
+
+  [[nodiscard]] double get_miss_rate() const {
+    uint64_t acc_cnt = hit_cnt + miss_cnt;
+    if (acc_cnt == 0) return std::numeric_limits<double>::infinity();
+    return double(miss_cnt) / double(acc_cnt);
+  }
+
   void reset() {
     hit_cnt = 0;
     miss_cnt = 0;
@@ -113,6 +120,9 @@ class GhostCache {
   [[nodiscard]] double get_hit_rate(uint32_t cache_size) const {
     return get_stat(cache_size).get_hit_rate();
   }
+  [[nodiscard]] double get_miss_rate(uint32_t cache_size) const {
+    return get_stat(cache_size).get_miss_rate();
+  }
 
   [[nodiscard]] const CacheStat& get_stat(uint32_t cache_size) const {
     assert(cache_size >= min_size);
@@ -162,6 +172,9 @@ class SampledGhostCache : public GhostCache {
 
   double get_hit_rate(uint32_t cache_size) const {
     return get_stat(cache_size).get_hit_rate();
+  }
+  double get_miss_rate(uint32_t cache_size) const {
+    return get_stat(cache_size).get_miss_rate();
   }
 
   const CacheStat& get_stat(uint32_t cache_size) const {

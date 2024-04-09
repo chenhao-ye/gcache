@@ -1,4 +1,5 @@
 # gcache
+![Build & Test](https://github.com/chenhao-ye/gcache/actions/workflows/cmake.yml/badge.svg)
 
 gcache is a high-performance header-only LRU cache library. It provides not only a customizable cache implementation, but also supports advanced features like ghost cache and multitenant cache.
 

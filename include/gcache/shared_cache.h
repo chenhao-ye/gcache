@@ -3,8 +3,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "gcache/lru_cache.h"
-#include "gcache/node.h"
+#include "lru_cache.h"
+#include "node.h"
 
 namespace gcache {
 

@@ -5,7 +5,7 @@
 #define crc_u32(x) _mm_crc32_u32(/*seed*/ 0x537, x)
 #elif defined(__ARM_FEATURE_CRC32)
 #define crc_u32(x) __builtin_aarch64_crc32cw(/*seed*/ 0x537, x)
-#elif
+#else
 #error "Unsupported architecture"
 #endif
 

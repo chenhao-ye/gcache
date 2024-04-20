@@ -1,6 +1,14 @@
 #pragma once
 
-#include <nmmintrin.h>  // for _mm_crc32_u32 instruction
+// for _mm_crc32_u32 instruction
+#if defined(__SSE4_2__)
+#include <nmmintrin.h>
+#define crc_u32(x) _mm_crc32_u32(/*seed*/ 0x537, x)
+#elif defined(__ARM_FEATURE_CRC32)
+#define crc_u32(x) __builtin_aarch64_crc32cw(/*seed*/ 0x537, x)
+#else
+#error "Unsupported architecture"
+#endif
 
 #include <cstdint>
 
@@ -32,9 +40,6 @@ namespace gcache {
   x ^= x >> 16;
   return x;
 }
-
-// From CRC
-#define crc_u32(x) _mm_crc32_u32(/*seed*/ 0x537, x)
 
 struct ghash {
   uint32_t operator()(uint32_t x) const noexcept { return crc_u32(x); }

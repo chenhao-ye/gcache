@@ -29,8 +29,11 @@ namespace gcache {
 
 template <typename Key_t, typename Value_t>
 class NodeTable;
+
 template <typename Key_t, typename Value_t, typename Hash>
 class LRUCache;
+
+template <typename Hash>
 class GhostCache;
 
 // LRUNodes forms a circular doubly linked list ordered by access time.
@@ -43,8 +46,11 @@ class LRUNode {
 
  protected:
   friend class NodeTable<Key_t, Value_t>;
+
   template <typename K, typename V, typename H>
   friend class LRUCache;
+
+  template <typename H>
   friend class GhostCache;
 
  public:
@@ -135,8 +141,11 @@ class LRUHandle : public BaseHandle<LRUNode<Key_t, Value_t>> {
 
  protected:
   friend class NodeTable<Key_t, Value_t>;
+
   template <typename K, typename V, typename H>
   friend class LRUCache;
+
+  template <typename H>
   friend class GhostCache;
 
  public:

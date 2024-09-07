@@ -15,7 +15,9 @@
 
 namespace gcache {
 
+template <typename Hash>
 class GhostCache;
+
 template <typename Tag_t, typename Key_t, typename Value_t, typename Hash>
 class SharedCache;
 
@@ -179,7 +181,9 @@ class LRUCache {
   // Pool for additionaly allocated handles.
   std::vector<Node_t*> extra_pool_;
 
+  template <typename H>
   friend class GhostCache;
+
   template <typename T, typename K, typename V, typename H>
   friend class SharedCache;
 

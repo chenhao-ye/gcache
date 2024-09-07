@@ -96,7 +96,7 @@ Ghost cache is a type of cache maintained to answer the question "what the cache
 
 // ctor needs the spectrum of cache sizes: the example below will maintain hit
 // rates for size=[4, 6, 8]
-gcache::GhostCache ghost_cache(/*tick*/ 2, /*min_size*/ 4, /*max_size*/ 8);
+gcache::GhostCache<> ghost_cache(/*tick*/ 2, /*min_size*/ 4, /*max_size*/ 8);
 
 // preheat: fill the cache
 for (auto blk_id : {1, 2, 3, 4, 5, 6, 7, 8}) ghost_cache.access(blk_id);
@@ -123,7 +123,7 @@ Using `SampledGhostCache` is straightforward. It is similar to `GhostCache` with
 ```C++
 // to make sure sampling is reasonable, `tick` must be no smaller than the
 // sample rate, and `min_size` and `max_size` must be multiple of sample rate.
-gcache::SampledGhostCache</*SampleShift*/5> ghost_cache(
+gcache::SampledGhostCache</*SampleShift*/5, /*Hash*/gcache::ghash> ghost_cache(
   /*tick*/ 64, /*min_size*/ 128, /*max_size*/ 640);
 // or use `gcache::SampledGhostCache<>` to use default SampleShift=5
 ```

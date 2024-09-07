@@ -22,6 +22,7 @@ enum AccessMode : uint8_t {
 /**
  * Simulate a set of page cache.
  */
+template <typename Hash = ghash>
 class GhostCache {
  protected:
   uint32_t tick;
@@ -33,10 +34,10 @@ class GhostCache {
   // Key is block_id/block number
   // Value is "size_idx", which means the handle will in cache if the cache size
   // is ((size_idx + 1) * tick) but not if the cache size is (size_idx * tick).
-  LRUCache<uint32_t, uint32_t, ghash> cache;
+  LRUCache<uint32_t, uint32_t, Hash> cache;
 
-  using Handle_t = LRUCache<uint32_t, uint32_t, ghash>::Handle_t;
-  using Node_t = LRUCache<uint32_t, uint32_t, ghash>::Node_t;
+  using Handle_t = LRUCache<uint32_t, uint32_t, Hash>::Handle_t;
+  using Node_t = LRUCache<uint32_t, uint32_t, Hash>::Node_t;
   // these must be placed after num_ticks to ensure a correct ctor order
   std::vector<Node_t*> size_boundaries;
   std::vector<CacheStat> caches_stat;
@@ -59,7 +60,7 @@ class GhostCache {
     cache.init(max_size);
   }
   void access(uint32_t block_id, AccessMode mode = AccessMode::DEFAULT) {
-    access_impl(block_id, ghash{}(block_id), mode);
+    access_impl(block_id, Hash{}(block_id), mode);
   }
 
   [[nodiscard]] uint32_t get_tick() const { return tick; }
@@ -93,12 +94,12 @@ class GhostCache {
 };
 
 // only sample 1/32 (~3.125%)
-template <uint32_t SampleShift = 5>
-class SampledGhostCache : public GhostCache {
+template <uint32_t SampleShift = 5, typename Hash = ghash>
+class SampledGhostCache : public GhostCache<Hash> {
  public:
   SampledGhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
-      : GhostCache(tick >> SampleShift, min_size >> SampleShift,
-                   max_size >> SampleShift) {
+      : GhostCache<Hash>(tick >> SampleShift, min_size >> SampleShift,
+                         max_size >> SampleShift) {
     assert(tick % (1 << SampleShift) == 0);
     assert(min_size % (1 << SampleShift) == 0);
     assert(max_size % (1 << SampleShift) == 0);
@@ -111,13 +112,14 @@ class SampledGhostCache : public GhostCache {
 
   // Only update ghost cache if the first few bits of hash is all zero
   void access(uint32_t block_id, AccessMode mode = AccessMode::DEFAULT) {
-    uint32_t hash = ghash{}(block_id);
-    if ((hash >> (32 - SampleShift)) == 0) access_impl(block_id, hash, mode);
+    uint32_t hash = Hash{}(block_id);
+    if ((hash >> (32 - SampleShift)) == 0)
+      this->access_impl(block_id, hash, mode);
   }
 
-  uint32_t get_tick() const { return tick << SampleShift; }
-  uint32_t get_min_size() const { return min_size << SampleShift; }
-  uint32_t get_max_size() const { return max_size << SampleShift; }
+  uint32_t get_tick() const { return this->tick << SampleShift; }
+  uint32_t get_min_size() const { return this->min_size << SampleShift; }
+  uint32_t get_max_size() const { return this->max_size << SampleShift; }
 
   double get_hit_rate(uint32_t cache_size) const {
     return get_stat(cache_size).get_hit_rate();
@@ -128,20 +130,21 @@ class SampledGhostCache : public GhostCache {
 
   const CacheStat& get_stat(uint32_t cache_size) const {
     cache_size >>= SampleShift;
-    assert(cache_size >= min_size);
-    assert(cache_size <= max_size);
-    assert((cache_size - min_size) % tick == 0);
-    uint32_t size_idx = (cache_size - min_size) / tick;
-    assert(size_idx < num_ticks);
-    return caches_stat[size_idx];
+    assert(cache_size >= this->min_size);
+    assert(cache_size <= this->max_size);
+    assert((cache_size - this->min_size) % this->tick == 0);
+    uint32_t size_idx = (cache_size - this->min_size) / this->tick;
+    assert(size_idx < this->num_ticks);
+    return this->caches_stat[size_idx];
   }
 };
 
 /**
  * When using ghost cache, we assume in_use list is always empty.
  */
-inline void GhostCache::access_impl(uint32_t block_id, uint32_t hash,
-                                    AccessMode mode) {
+template <typename Hash>
+inline void GhostCache<Hash>::access_impl(uint32_t block_id, uint32_t hash,
+                                          AccessMode mode) {
   uint32_t size_idx;
   Handle_t s;  // successor
   Handle_t h = cache.refresh(block_id, hash, s);
@@ -206,7 +209,9 @@ inline void GhostCache::access_impl(uint32_t block_id, uint32_t hash,
   *h = 0;
 }
 
-inline std::ostream& GhostCache::print(std::ostream& os, int indent) const {
+template <typename Hash>
+inline std::ostream& GhostCache<Hash>::print(std::ostream& os,
+                                             int indent) const {
   os << "GhostCache (tick=" << tick << ", min=" << min_size
      << ", max=" << max_size << ", num_ticks=" << num_ticks
      << ", lru_size=" << lru_size << ") {\n";

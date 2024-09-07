@@ -44,4 +44,16 @@ struct ghash {
   uint32_t operator()(uint32_t x) const noexcept { return crc_u32(x); }
 };
 
+struct idhash {  // identical mapping
+  uint32_t operator()(uint32_t x) const noexcept { return x; }
+};
+
+struct xxhash {
+  uint32_t operator()(uint32_t x) const noexcept { return xxhash_u32(x); }
+};
+
+struct murmurhash {
+  uint32_t operator()(uint32_t x) const noexcept { return murmurhash_u32(x); }
+};
+
 }  // namespace gcache

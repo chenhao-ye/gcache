@@ -22,7 +22,7 @@ static OffsetType wl_type = OffsetType::ZIPF;
 static uint64_t num_blocks = 1024 * 1024 * 1024 / 4096;  // 1 GB
 static uint64_t num_files = 32;
 static uint64_t num_blocks_per_op = 4;  // 16K read per op
-static uint64_t num_ops = 1'000'000;   // 1M
+static uint64_t num_ops = 1'000'000;    // 1M
 static uint64_t preheat_num_ops = num_ops / 10;
 static double zipf_theta = 0.99;
 static uint64_t rand_seed = 0x537;  // enable different runs
@@ -153,7 +153,7 @@ int main(int argc, char* argv[]) {
 
   uint64_t offset_checksum1 = 0, offset_checksum2 = 0, offset_checksum3 = 0;
 
-  gcache::GhostCache ghost_cache(cache_tick, cache_min, cache_max);
+  gcache::GhostCache<> ghost_cache(cache_tick, cache_min, cache_max);
   gcache::SampledGhostCache<SAMPLE_SHIFT> sampled_ghost_cache(
       cache_tick, cache_min, cache_max);
 

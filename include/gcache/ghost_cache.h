@@ -36,8 +36,8 @@ class GhostCache {
   // is ((size_idx + 1) * tick) but not if the cache size is (size_idx * tick).
   LRUCache<uint32_t, uint32_t, Hash> cache;
 
-  using Handle_t = LRUCache<uint32_t, uint32_t, Hash>::Handle_t;
-  using Node_t = LRUCache<uint32_t, uint32_t, Hash>::Node_t;
+  using Handle_t = typename LRUCache<uint32_t, uint32_t, Hash>::Handle_t;
+  using Node_t = typename LRUCache<uint32_t, uint32_t, Hash>::Node_t;
   // these must be placed after num_ticks to ensure a correct ctor order
   std::vector<Node_t*> size_boundaries;
   std::vector<CacheStat> caches_stat;

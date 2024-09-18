@@ -3,7 +3,6 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
-#include <stdexcept>
 
 #include "gcache/ghost_cache.h"
 #include "gcache/node.h"
@@ -17,7 +16,7 @@ constexpr const uint32_t large_bench_size = 2 * 1024 * 1024;  // 8 GB cache
 constexpr const uint32_t sample_shift = 5;
 
 void test1() {
-  GhostCache ghost_cache(1, 3, 6);
+  GhostCache<> ghost_cache(1, 3, 6);
   std::cout << "=== Test 1 ===\n";
 
   ghost_cache.access(0);
@@ -61,7 +60,7 @@ void test1() {
 }
 
 void test2() {
-  GhostCache ghost_cache(2, 2, 6);
+  GhostCache<> ghost_cache(2, 2, 6);
   std::cout << "=== Test 2 ===\n";
 
   ghost_cache.access(0);
@@ -107,7 +106,7 @@ void test2() {
 }
 
 void bench1() {
-  GhostCache ghost_cache(bench_size / 32, bench_size / 32, bench_size);
+  GhostCache<> ghost_cache(bench_size / 32, bench_size / 32, bench_size);
 
   // filling the cache
   auto ts0 = rdtsc();
@@ -170,7 +169,7 @@ void bench2() {
 }
 
 void bench3() {
-  GhostCache ghost_cache(bench_size / 32, bench_size / 32, bench_size);
+  GhostCache<> ghost_cache(bench_size / 32, bench_size / 32, bench_size);
   SampledGhostCache<sample_shift> sampled_ghost_cache(
       bench_size / 32, bench_size / 32, bench_size);
 
@@ -225,7 +224,7 @@ void bench3() {
 }
 
 void bench4() {
-  GhostCache ghost_cache(large_bench_size / 32, large_bench_size / 32,
+  GhostCache<> ghost_cache(large_bench_size / 32, large_bench_size / 32,
                          large_bench_size);
   SampledGhostCache<sample_shift> sampled_ghost_cache(
       large_bench_size / 32, large_bench_size / 32, large_bench_size);
@@ -281,7 +280,7 @@ void bench4() {
 }
 
 void bench5() {
-  GhostCache ghost_cache(large_bench_size / 32, large_bench_size / 32,
+  GhostCache<> ghost_cache(large_bench_size / 32, large_bench_size / 32,
                          large_bench_size);
   SampledGhostCache<sample_shift> sampled_ghost_cache(
       large_bench_size / 32, large_bench_size / 32, large_bench_size);

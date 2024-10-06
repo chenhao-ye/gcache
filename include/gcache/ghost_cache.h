@@ -29,17 +29,16 @@ class GhostCache {
   uint32_t min_size;
   uint32_t max_size;
   uint32_t num_ticks;
-  uint32_t lru_size;  // Number of handles in cache LRU right now
 
   // Key is block_id/block number
-  // Value is "size_idx", which means the handle will in cache if the cache size
-  // is ((size_idx + 1) * tick) but not if the cache size is (size_idx * tick).
+  // Value is "size_idx", which is the least non-negative number such that the
+  // key will in cache if the cache size is (size_idx * tick) + min_size
   LRUCache<uint32_t, uint32_t, Hash> cache;
 
   using Handle_t = typename LRUCache<uint32_t, uint32_t, Hash>::Handle_t;
   using Node_t = typename LRUCache<uint32_t, uint32_t, Hash>::Node_t;
   // these must be placed after num_ticks to ensure a correct ctor order
-  std::vector<Node_t*> size_boundaries;
+  std::vector<Node_t*> boundaries;
   std::vector<CacheStat> caches_stat;
 
   void access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
@@ -50,15 +49,16 @@ class GhostCache {
         min_size(min_size),
         max_size(max_size),
         num_ticks((max_size - min_size) / tick + 1),
-        lru_size(0),
         cache(),
-        size_boundaries(num_ticks, nullptr),
+        boundaries(num_ticks - 1, nullptr),
         caches_stat(num_ticks) {
     assert(tick > 0);
     assert(min_size > 1);  // otherwise the first boundary will be LRU evicted
     assert(min_size + (num_ticks - 1) * tick == max_size);
+    assert(num_ticks > 2);
     cache.init(max_size);
   }
+
   void access(uint32_t block_id, AccessMode mode = AccessMode::DEFAULT) {
     access_impl(block_id, Hash{}(block_id), mode);
   }
@@ -85,6 +85,18 @@ class GhostCache {
 
   void reset_stat() {
     for (auto& s : caches_stat) s.reset();
+  }
+
+  // For each item in the LRU list, call fn(key) in LRU order
+  template <typename Fn>
+  void for_each_lru(Fn&& fn) {
+    cache.for_each_lru([&fn](Handle_t h) { fn(h.get_key()); });
+  }
+
+  // For each item in the LRU list, call fn(key) in LRU order
+  template <typename Fn>
+  void for_each_mru(Fn&& fn) {
+    cache.for_each_mru([&fn](Handle_t h) { fn(h.get_key()); });
   }
 
   std::ostream& print(std::ostream& os, int indent = 0) const;
@@ -145,47 +157,61 @@ class SampledGhostCache : public GhostCache<Hash> {
 template <typename Hash>
 inline void GhostCache<Hash>::access_impl(uint32_t block_id, uint32_t hash,
                                           AccessMode mode) {
-  uint32_t size_idx;
   Handle_t s;  // successor
   Handle_t h = cache.refresh(block_id, hash, s);
   assert(h);  // Since there is no handle in use, allocation must never fail.
 
   /**
-   * To reason through the code below, consider an example where min_size=1,
-   * max_size=5, tick=2.
-   *  DummyHead <=> A <=> B <=> C <=> D <=> E, where E is MRU and A is LRU.
-   *  size_idx:     2,    1,    1,    0,    0.
-   *  size_boundaries:   [1]         [0]
+   * To reason through the code below, consider an example where min_size=3,
+   * max_size=7, tick=2, num_ticks=3.
+   *              (LRU)                               (MRU)
+   *  DummyHead <=> A <=> B <=> C <=> D <=> E <=> F <=> G.
+   *  size_idx:     2,    2,    1,    1,    0,    0,    0.
+   *  boundaries:              [1]         [0]
    *
-   * Now B is accessed, so the list becomes:
-   *  DummyHead <=> A <=> C <=> D <=> E <=> B.
-   *  size_idx:     2,    1,    1,    0,    0.
-   *  size_boundaries:   [1]         [0]
-   * To get to this state,
-   *  1) boundaries with size_idx < B should move to its next and increase
-   *     its size_idx
-   *  2) if B itself is a boundary, set that boundary to B's sucessor.
+   * If B is accessed, the list becomes:
+   *  DummyHead <=> A <=> C <=> D <=> E <=> F <=> G <=> B.
+   *  size_idx:     2,    2,    1,    1,    0,    0,    0.
+   *  idx_changed:        ^           ^                 ^
+   *  boundaries:              [1]         [0]
+   *
+   * If instead C is accessed, so the list becomes:
+   *  DummyHead <=> A <=> B <=> D <=> E <=> F <=> G <=> C.
+   *  size_idx:     2,    2,    1,    1,    0,    0,    0.
+   *  idx_changed:                    ^                 ^
+   *  boundaries:              [1]         [0]
+   *
+   * This means when X is accessed:
+   * 1) every node at boundary with size_idx < X should increase its size_idx
+   *    and the boundary pointer shall move to its next.
+   * 2) X's size_idx should be set to 0.
+   * 3) if X itself is a boundary, set that boundary to X's next (sucessor).
    */
+  uint32_t size_idx;
   if (s) {  // No new insertion
     size_idx = *h;
-    if (size_idx < num_ticks && size_boundaries[size_idx] == h.node)
-      size_boundaries[size_idx] = s.node;
+    if (size_idx < num_ticks - 1 && boundaries[size_idx] == h.node)
+      boundaries[size_idx] = s.node;
   } else {
-    assert(lru_size <= max_size);
-    if (lru_size < max_size) ++lru_size;
-    if (lru_size <= min_size)
-      size_idx = 0;
-    else
-      size_idx = (lru_size - min_size + tick - 1) / tick;
-    if (size_idx < num_ticks && lru_size - min_size == size_idx * tick)
-      size_boundaries[size_idx] = cache.lru_.next;
+    // New insertion happened may because
+    // 1) even max_size cannot cache the block
+    // 2) this block has never been accessed before
+    // For simplicity, both cases are handled uniformly by treating it as a miss
+    assert(cache.size() <= max_size);
+    size_idx = cache.size() > min_size
+                   ? (cache.size() - min_size + tick - 1) / tick
+                   : 0;
+    if (size_idx < num_ticks - 1 && cache.size() == size_idx * tick + min_size)
+      boundaries[size_idx] = cache.lru_.next;
   }
   for (uint32_t i = 0; i < size_idx; ++i) {
-    auto& b = size_boundaries[i];
+    auto& b = boundaries[i];
     if (!b) continue;
     b->value++;
     b = b->next;
   }
+  *h = 0;
+
   switch (mode) {
     case AccessMode::DEFAULT:
       if (s) {
@@ -205,8 +231,6 @@ inline void GhostCache<Hash>::access_impl(uint32_t block_id, uint32_t hash,
     case AccessMode::NOOP:
       break;
   }
-
-  *h = 0;
 }
 
 template <typename Hash>
@@ -214,18 +238,18 @@ inline std::ostream& GhostCache<Hash>::print(std::ostream& os,
                                              int indent) const {
   os << "GhostCache (tick=" << tick << ", min=" << min_size
      << ", max=" << max_size << ", num_ticks=" << num_ticks
-     << ", lru_size=" << lru_size << ") {\n";
+     << ", size=" << cache.size() << ") {\n";
 
   for (int i = 0; i < indent + 1; ++i) os << '\t';
   os << "Boundaries: [";
-  if (size_boundaries[0])
-    os << size_boundaries[0]->key;
+  if (boundaries[0])
+    os << boundaries[0]->key;
   else
     os << "(null)";
-  for (uint32_t i = 1; i < num_ticks; ++i) {
+  for (uint32_t i = 1; i < boundaries.size(); ++i) {
     os << ", ";
-    if (size_boundaries[i])
-      os << size_boundaries[i]->key;
+    if (boundaries[i])
+      os << boundaries[i]->key;
     else
       os << "(null)";
   }

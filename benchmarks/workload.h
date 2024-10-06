@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <random>
 #include <stdexcept>
-#include <vector>
 
 enum class OffsetType { UNIF, ZIPF, SEQ };
 

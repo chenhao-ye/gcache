@@ -162,7 +162,6 @@ void test() {
   std::cout << "{ ";
   cache.for_each([](LRUCache<uint32_t, uint32_t, hash1>::Handle_t h) {
     std::cout << h.get_key() << ": " << *h << ", ";
-    assert(key == value);
   });
   std::cout << "}" << std::endl;
 

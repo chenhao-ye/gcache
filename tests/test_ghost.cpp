@@ -16,93 +16,146 @@ constexpr const uint32_t large_bench_size = 2 * 1024 * 1024;  // 8 GB cache
 constexpr const uint32_t sample_shift = 5;
 
 void test1() {
-  GhostCache<> ghost_cache(1, 3, 6);
   std::cout << "=== Test 1 ===\n";
+  GhostCache<> ghost_cache(1, 3, 6);
 
   ghost_cache.access(0);
   ghost_cache.access(1);
   ghost_cache.access(2);
   ghost_cache.access(3);
-  std::cout << "Expect: Boundaries: [1, 0, (null), (null)]; "
+  std::cout << "Ops: Access [0, 1, 2, 3]" << std::endl;
+  std::cout << "Expect: Boundaries: [1, 0, (null)]; "
                "Stat: [0/4, 0/4, 0/4, 0/4]\n";
-  std::cout << ghost_cache;
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(4);
   ghost_cache.access(5);
-  std::cout << "Expect: Boundaries: [3, 2, 1, 0]; Stat: [0/6, 0/6, 0/6, 0/6]\n";
-  std::cout << ghost_cache;
+  std::cout << "Ops: Access [4, 5]" << std::endl;
+  std::cout << "Expect: Boundaries: [3, 2, 1]; Stat: [0/6, 0/6, 0/6, 0/6]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(2);
-  std::cout << "Expect: Boundaries: [4, 3, 1, 0]; Stat: [0/7, 1/7, 1/7, 1/7]\n";
-  std::cout << ghost_cache;
+  std::cout << "Ops: Access [2]" << std::endl;
+  std::cout << "Expect: Boundaries: [4, 3, 1]; Stat: [0/7, 1/7, 1/7, 1/7]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(4);
-  std::cout << "Expect: Boundaries: [5, 3, 1, 0]; Stat: [1/8, 2/8, 2/8, 2/8]\n";
-  std::cout << ghost_cache;
-  std::cout << std::flush;
+  std::cout << "Ops: Access [4]" << std::endl;
+  std::cout << "Expect: Boundaries: [5, 3, 1]; Stat: [1/8, 2/8, 2/8, 2/8]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(2, AccessMode::AS_MISS);
-  std::cout << "Expect: Boundaries: [5, 3, 1, 0]; Stat: [1/9, 2/9, 2/9, 2/9]\n";
-  std::cout << ghost_cache;
-  std::cout << std::flush;
+  std::cout << "Ops: Access [2:AS_MISS]" << std::endl;
+  std::cout << "Expect: Boundaries: [5, 3, 1]; Stat: [1/9, 2/9, 2/9, 2/9]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(0, AccessMode::AS_HIT);
+  std::cout << "Ops: Access [0:AS_HIT]" << std::endl;
   std::cout
-      << "Expect: Boundaries: [4, 5, 3, 1]; Stat: [2/10, 3/10, 3/10, 3/10]\n";
-  std::cout << ghost_cache;
-  std::cout << std::flush;
+      << "Expect: Boundaries: [4, 5, 3]; Stat: [2/10, 3/10, 3/10, 3/10]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(7, AccessMode::NOOP);
+  std::cout << "Ops: Access [7:NOOP]" << std::endl;
   std::cout
-      << "Expect: Boundaries: [2, 4, 5, 3]; Stat: [2/10, 3/10, 3/10, 3/10]\n";
-  std::cout << ghost_cache;
-  std::cout << std::flush;
+      << "Expect: Boundaries: [2, 4, 5]; Stat: [2/10, 3/10, 3/10, 3/10]\n";
+  std::cout << ghost_cache << std::endl;
 }
 
 void test2() {
-  GhostCache<> ghost_cache(2, 2, 6);
   std::cout << "=== Test 2 ===\n";
+  GhostCache<> ghost_cache(2, 2, 6);
 
   ghost_cache.access(0);
   ghost_cache.access(1);
   ghost_cache.access(2);
   ghost_cache.access(3);
-  std::cout << "Expect: Boundaries: [2, 0, (null)]; Stat: [0/4, 0/4, 0/4]\n";
-  std::cout << ghost_cache;
+  std::cout << "Ops: Access [0, 1, 2, 3]" << std::endl;
+  std::cout << "Expect: Boundaries: [2, 0]; Stat: [0/4, 0/4, 0/4]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(4);
   ghost_cache.access(5);
-  std::cout << "Expect: Boundaries: [4, 2, 0]; Stat: [0/6, 0/6, 0/6]\n";
-  std::cout << ghost_cache;
+  std::cout << "Ops: Access [4, 5]" << std::endl;
+  std::cout << "Expect: Boundaries: [4, 2]; Stat: [0/6, 0/6, 0/6]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(6);
   ghost_cache.access(7);
-  std::cout << "Expect: Boundaries: [6, 4, 2]; Stat: [0/8, 0/8, 0/8]\n";
-  std::cout << ghost_cache;
+  std::cout << "Ops: Access [6, 7]" << std::endl;
+  std::cout << "Expect: Boundaries: [6, 4]; Stat: [0/8, 0/8, 0/8]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(1);
-  std::cout << "Expect: Boundaries: [7, 5, 3]; Stat: [0/9, 0/9, 0/9]\n";
-  std::cout << ghost_cache;
+  std::cout << "Ops: Access [1]" << std::endl;
+  std::cout << "Expect: Boundaries: [7, 5]; Stat: [0/9, 0/9, 0/9]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(4);
-  std::cout << "Expect: Boundaries: [1, 6, 3]; Stat: [0/10, 0/10, 1/10]\n";
-  std::cout << ghost_cache;
-  std::cout << std::flush;
+  std::cout << "Ops: Access [4]" << std::endl;
+  std::cout << "Expect: Boundaries: [1, 6]; Stat: [0/10, 0/10, 1/10]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(8, AccessMode::NOOP);
-  std::cout << "Expect: Boundaries: [4, 7, 5]; Stat: [0/10, 0/10, 1/10]\n";
-  std::cout << ghost_cache;
-  std::cout << std::flush;
+  std::cout << "Ops: Access [8:NOOP]" << std::endl;
+  std::cout << "Expect: Boundaries: [4, 7]; Stat: [0/10, 0/10, 1/10]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(9, AccessMode::AS_HIT);
-  std::cout << "Expect: Boundaries: [8, 1, 6]; Stat: [1/11, 1/11, 2/11]\n";
-  std::cout << ghost_cache;
-  std::cout << std::flush;
+  std::cout << "Ops: Access [9:AS_HIT]" << std::endl;
+  std::cout << "Expect: Boundaries: [8, 1]; Stat: [1/11, 1/11, 2/11]\n";
+  std::cout << ghost_cache << std::endl;
 
   ghost_cache.access(1, AccessMode::AS_MISS);
-  std::cout << "Expect: Boundaries: [9, 4, 6]; Stat: [1/12, 1/12, 2/12]\n";
-  std::cout << ghost_cache;
-  std::cout << std::flush;
+  std::cout << "Ops: Access [1:AS_MISS]" << std::endl;
+  std::cout << "Expect: Boundaries: [9, 4]; Stat: [1/12, 1/12, 2/12]\n";
+  std::cout << ghost_cache << std::endl;
+}
+
+// for checkpoint and recover
+void test3() {
+  GhostCache<> ghost_cache(2, 2, 6);
+  std::cout << "=== Test 3 ===\n";
+
+  ghost_cache.access(0);
+  ghost_cache.access(1);
+  ghost_cache.access(2);
+  ghost_cache.access(3);
+  ghost_cache.access(4);
+  ghost_cache.access(5);
+  ghost_cache.access(6);
+  ghost_cache.access(7);
+  ghost_cache.access(1);
+  ghost_cache.access(4);
+  ghost_cache.access(8);
+  ghost_cache.access(9);
+  ghost_cache.access(1);
+  std::cout << "Ops: Access [0, 1, 2, 3, 4, 5, 6, 7, 1, 4, 8, 9, 1]"
+            << std::endl;
+
+  std::vector<uint32_t> ckpt;
+  ghost_cache.for_each_lru([&ckpt](uint32_t key) { ckpt.emplace_back(key); });
+
+  GhostCache<> ghost_cache2(3, 2, 11);
+  for (auto key : ckpt) ghost_cache2.access(key, AccessMode::NOOP);
+
+  std::cout << "Recover from checkpoint" << std::endl;
+  std::cout
+      << "Expect: LRU: [6, 7, 4, 8, 9, 1]; Boundaries: [9, 7, (null), (null)]; "
+         "Stat: [0/0, 0/0, 0/0, 0/0]\n";
+  std::cout << ghost_cache2;
+
+  std::cout << "Ops: Access [2, 4, 3, 0]" << std::endl;
+  ghost_cache2.access(2);
+  ghost_cache2.access(4);
+  ghost_cache2.access(3);
+  ghost_cache2.access(0);
+  std::cout << "Expect: LRU: [6, 7, 8, 9, 1, 2, 4, 3, 0]; Boundaries: [3, 1, "
+               "7, (null)]; "
+               "Stat: [0/4, 1/4, 1/4, 1/4]\n";
+  std::cout << ghost_cache2;
+
+  std::cout << std::endl;
 }
 
 void bench1() {
@@ -140,7 +193,7 @@ void bench1() {
   std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
   std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
   std::cout << "Hash: " << (ts4 - ts3) / bench_size << " cycles/op\n";
-  std::cout << std::flush;
+  std::cout << std::endl;
 }
 
 void bench2() {
@@ -165,7 +218,7 @@ void bench2() {
   std::cout << "Fill: " << (ts1 - ts0) / bench_size << " cycles/op\n";
   std::cout << "Hit:  " << (ts2 - ts1) / bench_size << " cycles/op\n";
   std::cout << "Miss: " << (ts3 - ts2) / bench_size << " cycles/op\n";
-  std::cout << std::flush;
+  std::cout << std::endl;
 }
 
 void bench3() {
@@ -220,12 +273,12 @@ void bench3() {
   }
   std::cout
       << "================================================================\n";
-  std::cout << std::flush;
+  std::cout << std::endl;
 }
 
 void bench4() {
   GhostCache<> ghost_cache(large_bench_size / 32, large_bench_size / 32,
-                         large_bench_size);
+                           large_bench_size);
   SampledGhostCache<sample_shift> sampled_ghost_cache(
       large_bench_size / 32, large_bench_size / 32, large_bench_size);
 
@@ -276,12 +329,12 @@ void bench4() {
   }
   std::cout
       << "================================================================\n";
-  std::cout << std::flush;
+  std::cout << std::endl;
 }
 
 void bench5() {
   GhostCache<> ghost_cache(large_bench_size / 32, large_bench_size / 32,
-                         large_bench_size);
+                           large_bench_size);
   SampledGhostCache<sample_shift> sampled_ghost_cache(
       large_bench_size / 32, large_bench_size / 32, large_bench_size);
 
@@ -324,12 +377,13 @@ void bench5() {
   }
   std::cout
       << "================================================================\n";
-  std::cout << std::flush;
+  std::cout << std::endl;
 }
 
 int main() {
   test1();
   test2();
+  test3();   // test checkpoint and recover
   bench1();  // ghost cache w/o sampling
   bench2();  // ghost cache w/ sampling
   bench3();  // hit rate comparsion

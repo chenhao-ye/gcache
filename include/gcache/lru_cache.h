@@ -61,6 +61,18 @@ class LRUCache {
   template <typename Fn>
   void for_each(Fn&& fn);
 
+  // For each item in the LRU list, call fn(key, handle) in LRU order
+  template <typename Fn>
+  void for_each_lru(Fn&& fn);
+
+  // For each item in the LRU list, call fn(key, handle) in MRU order
+  template <typename Fn>
+  void for_each_mru(Fn&& fn);
+
+  // For each item in the in-use list, call fn(key, handle)
+  template <typename Fn>
+  void for_each_in_use(Fn&& fn);
+
   // Set pin to be true to pin the returned node so it won't be recycled by
   // LRU; a pinned node must be unpinned later by calling release().
 
@@ -257,8 +269,26 @@ inline void LRUCache<Key_t, Value_t, Hash>::init(size_t capacity, Fn&& fn) {
 template <typename Key_t, typename Value_t, typename Hash>
 template <typename Fn>
 inline void LRUCache<Key_t, Value_t, Hash>::for_each(Fn&& fn) {
-  in_use_.for_each(fn);
-  lru_.for_each(fn);
+  for_each_lru(fn);
+  for_each_in_use(fn);
+}
+
+template <typename Key_t, typename Value_t, typename Hash>
+template <typename Fn>
+inline void LRUCache<Key_t, Value_t, Hash>::for_each_lru(Fn&& fn) {
+  for (auto h = lru_.next; h != &lru_; h = h->next) fn(h);
+}
+
+template <typename Key_t, typename Value_t, typename Hash>
+template <typename Fn>
+inline void LRUCache<Key_t, Value_t, Hash>::for_each_mru(Fn&& fn) {
+  for (auto h = lru_.prev; h != &lru_; h = h->prev) fn(h);
+}
+
+template <typename Key_t, typename Value_t, typename Hash>
+template <typename Fn>
+inline void LRUCache<Key_t, Value_t, Hash>::for_each_in_use(Fn&& fn) {
+  for (auto h = in_use_.next; h != &in_use_; h = h->next) fn(h);
 }
 
 template <typename Key_t, typename Value_t, typename Hash>

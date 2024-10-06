@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
+#include <ostream>
 #include <stdexcept>
 
 #include "gcache/lru_cache.h"
@@ -156,7 +157,33 @@ void test() {
   std::cout << "\n=== Expect: lru: [5, 8, 9], in_use: [6] ===\n";
   std::cout << cache;
 
+  // test for_each
+  std::cout << "\n=== Expect: { 5: 555, 8: 888, 9: 999, 6: 666, } ===\n";
+  std::cout << "{ ";
+  cache.for_each([](LRUCache<uint32_t, uint32_t, hash1>::Handle_t h) {
+    std::cout << h.get_key() << ": " << *h << ", ";
+    assert(key == value);
+  });
+  std::cout << "}" << std::endl;
+
   cache.release(h6);
+
+  // test for checkpoint and recover
+  std::vector<std::pair<uint32_t, uint32_t>> ckpt;
+  cache.for_each_lru([&ckpt](LRUCache<uint32_t, uint32_t, hash1>::Handle_t h) {
+    ckpt.emplace_back(h.get_key(), *h);
+  });
+
+  LRUCache<uint32_t, uint32_t, hash1> cache_recovered;
+  cache_recovered.init(4);
+  for (auto& [key, value] : ckpt) {
+    auto h = cache_recovered.insert(key, true);
+    assert(h);
+    *h = value;
+    cache_recovered.release(h);
+  }
+  std::cout << "\n=== Expect: { 5: 555, 8: 888, 9: 999, 6: 666, } ===\n";
+  std::cout << cache_recovered;
 
   std::cout << std::flush;
 }

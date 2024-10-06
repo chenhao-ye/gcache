@@ -70,11 +70,6 @@ class LRUNode {
     return os << h.key << " (refs=" << h.refs << ", hash=" << h.hash << ")";
   }
 
-  template <typename Fn>
-  void for_each(Fn fn) {
-    for (auto h = next; h != this; h = h->next) fn(h->key, h);
-  }
-
   // print a list; this must be a dummy list head
   std::ostream &print_list(std::ostream &os) const {
     auto h = next;

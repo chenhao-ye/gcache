@@ -1,15 +1,21 @@
 #pragma once
 
+#include <cstdint>
+
 #if defined(__SSE4_2__)
-#include <nmmintrin.h>
-#define crc_u32(x) _mm_crc32_u32(/*seed*/ 0x537, x)
+#include <nmmintrin.h>  // for _mm_crc32_u32 instruction
+#define crc32_u8 _mm_crc32_u8
+#define crc32_u16 _mm_crc32_u16
+#define crc32_u32 _mm_crc32_u32
+#define crc32_u64 _mm_crc32_u64
 #elif defined(__ARM_FEATURE_CRC32)
-#define crc_u32(x) __builtin_aarch64_crc32cw(/*seed*/ 0x537, x)
+#define crc32_u8 __builtin_aarch64_crc32cb
+#define crc32_u16 __builtin_aarch64_crc32ch
+#define crc32_u32 __builtin_aarch64_crc32cw
+#define crc32_u64 __builtin_aarch64_crc32cx
 #else
 #error "Unsupported architecture"
 #endif
-
-#include <cstdint>
 
 namespace gcache {
 
@@ -40,8 +46,10 @@ namespace gcache {
   return x;
 }
 
+/* Hash for uint32_t */
+
 struct ghash {  // default hash function for gcache
-  uint32_t operator()(uint32_t x) const noexcept { return crc_u32(x); }
+  uint32_t operator()(uint32_t x) const noexcept { return crc32_u32(0x537, x); }
 };
 
 struct idhash {  // identical mapping
@@ -54,6 +62,73 @@ struct xxhash {
 
 struct murmurhash {
   uint32_t operator()(uint32_t x) const noexcept { return murmurhash_u32(x); }
+};
+
+/* Hash for string */
+
+// https://stackoverflow.com/questions/53871074/how-to-implement-a-hash-function-for-strings-in-c-using-crc32c-instruction-from
+
+static inline uint64_t byte_crc32(unsigned int crc, const char **buf,
+                                  size_t len) {
+  while (len > 0) {
+    crc = crc32_u8(crc, *(const unsigned char *)(*buf));
+    ++*buf;
+    --len;
+  }
+  return crc;
+}
+
+static inline uint64_t hw_crc32(unsigned int crc, const char **buf,
+                                size_t len) {
+  while (len > 0) {
+    crc = crc32_u16(crc, *(const uint16_t *)(*buf));
+    *buf += 2;
+    --len;
+  }
+  return crc;
+}
+
+static inline uint64_t word_crc32(unsigned int crc, const char **buf,
+                                  size_t len) {
+  while (len > 0) {
+    crc = crc32_u32(crc, *(const uint32_t *)(*buf));
+    *buf += 4;
+    --len;
+  }
+  return crc;
+}
+
+static inline uint64_t dword_crc32(uint64_t crc, const char **buf, size_t len) {
+  while (len > 0) {
+    crc = crc32_u64(crc, *(const uint64_t *)(*buf));
+    *buf += 8;
+    --len;
+  }
+  return crc;
+}
+
+static inline uint64_t str_crc32(const char *buf, size_t len) {
+  const size_t dword_chunks = len / 8;
+  const size_t dword_diff = len % 8;
+
+  const size_t word_chunks = dword_diff / 4;
+  const size_t word_diff = dword_diff % 4;
+
+  const size_t hw_chunks = word_diff / 2;
+  const size_t hw_diff = word_diff % 2;
+
+  uint64_t crc = byte_crc32(0, &buf, hw_diff);
+  crc = hw_crc32(crc, &buf, hw_chunks);
+  crc = word_crc32(crc, &buf, word_chunks);
+  crc = dword_crc32(crc, &buf, dword_chunks);
+
+  return crc;
+}
+
+struct ghash_str {
+  uint32_t operator()(const char *buf, size_t len) const noexcept {
+    return str_crc32(buf, len);
+  };
 };
 
 }  // namespace gcache

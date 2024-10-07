@@ -48,7 +48,7 @@ class GhostCache {
   std::vector<Node_t*> boundaries;
   std::vector<CacheStat> caches_stat;
 
-  void access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
+  Handle_t access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
 
  public:
   GhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
@@ -163,9 +163,9 @@ class SampledGhostCache : public GhostCache<Hash, Meta> {
  * When using ghost cache, we assume in_use list is always empty.
  */
 template <typename Hash, typename Meta>
-inline void GhostCache<Hash, Meta>::access_impl(uint32_t block_id,
-                                                uint32_t hash,
-                                                AccessMode mode) {
+inline typename GhostCache<Hash, Meta>::Handle_t
+GhostCache<Hash, Meta>::access_impl(uint32_t block_id, uint32_t hash,
+                                    AccessMode mode) {
   Handle_t s;  // successor
   Handle_t h = cache.refresh(block_id, hash, s);
   assert(h);  // Since there is no handle in use, allocation must never fail.
@@ -240,6 +240,7 @@ inline void GhostCache<Hash, Meta>::access_impl(uint32_t block_id,
     case AccessMode::NOOP:
       break;
   }
+  return h;
 }
 
 template <typename Hash, typename Meta>

@@ -40,7 +40,7 @@ namespace gcache {
   return x;
 }
 
-struct ghash {
+struct ghash {  // default hash function for gcache
   uint32_t operator()(uint32_t x) const noexcept { return crc_u32(x); }
 };
 

@@ -19,10 +19,17 @@ enum AccessMode : uint8_t {
   NOOP,     // do not update
 };
 
+struct GhostMeta {
+  uint32_t size_idx;
+};
+
 /**
- * Simulate a set of page cache.
+ * Simulate a set of page cache, where each page only carry thin metadata
+ * Templated type Meta must have a field size_idx; in almost all cases, this
+ * field does not need to specified; it is only useful if there is some
+ * additional per-page metadata to be carried.
  */
-template <typename Hash = ghash>
+template <typename Hash = ghash, typename Meta = GhostMeta>
 class GhostCache {
  protected:
   uint32_t tick;
@@ -33,10 +40,10 @@ class GhostCache {
   // Key is block_id/block number
   // Value is "size_idx", which is the least non-negative number such that the
   // key will in cache if the cache size is (size_idx * tick) + min_size
-  LRUCache<uint32_t, uint32_t, Hash> cache;
+  LRUCache<uint32_t, Meta, Hash> cache;
 
-  using Handle_t = typename LRUCache<uint32_t, uint32_t, Hash>::Handle_t;
-  using Node_t = typename LRUCache<uint32_t, uint32_t, Hash>::Node_t;
+  using Handle_t = typename LRUCache<uint32_t, Meta, Hash>::Handle_t;
+  using Node_t = typename LRUCache<uint32_t, Meta, Hash>::Node_t;
   // these must be placed after num_ticks to ensure a correct ctor order
   std::vector<Node_t*> boundaries;
   std::vector<CacheStat> caches_stat;
@@ -106,12 +113,13 @@ class GhostCache {
 };
 
 // only sample 1/32 (~3.125%)
-template <uint32_t SampleShift = 5, typename Hash = ghash>
-class SampledGhostCache : public GhostCache<Hash> {
+template <uint32_t SampleShift = 5, typename Hash = ghash,
+          typename Meta = GhostMeta>
+class SampledGhostCache : public GhostCache<Hash, Meta> {
  public:
   SampledGhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
-      : GhostCache<Hash>(tick >> SampleShift, min_size >> SampleShift,
-                         max_size >> SampleShift) {
+      : GhostCache<Hash, Meta>(tick >> SampleShift, min_size >> SampleShift,
+                               max_size >> SampleShift) {
     assert(tick % (1 << SampleShift) == 0);
     assert(min_size % (1 << SampleShift) == 0);
     assert(max_size % (1 << SampleShift) == 0);
@@ -154,9 +162,10 @@ class SampledGhostCache : public GhostCache<Hash> {
 /**
  * When using ghost cache, we assume in_use list is always empty.
  */
-template <typename Hash>
-inline void GhostCache<Hash>::access_impl(uint32_t block_id, uint32_t hash,
-                                          AccessMode mode) {
+template <typename Hash, typename Meta>
+inline void GhostCache<Hash, Meta>::access_impl(uint32_t block_id,
+                                                uint32_t hash,
+                                                AccessMode mode) {
   Handle_t s;  // successor
   Handle_t h = cache.refresh(block_id, hash, s);
   assert(h);  // Since there is no handle in use, allocation must never fail.
@@ -189,7 +198,7 @@ inline void GhostCache<Hash>::access_impl(uint32_t block_id, uint32_t hash,
    */
   uint32_t size_idx;
   if (s) {  // No new insertion
-    size_idx = *h;
+    size_idx = h->size_idx;
     if (size_idx < num_ticks - 1 && boundaries[size_idx] == h.node)
       boundaries[size_idx] = s.node;
   } else {
@@ -207,10 +216,10 @@ inline void GhostCache<Hash>::access_impl(uint32_t block_id, uint32_t hash,
   for (uint32_t i = 0; i < size_idx; ++i) {
     auto& b = boundaries[i];
     if (!b) continue;
-    b->value++;
+    b->value.size_idx++;
     b = b->next;
   }
-  *h = 0;
+  h->size_idx = 0;
 
   switch (mode) {
     case AccessMode::DEFAULT:
@@ -233,9 +242,9 @@ inline void GhostCache<Hash>::access_impl(uint32_t block_id, uint32_t hash,
   }
 }
 
-template <typename Hash>
-inline std::ostream& GhostCache<Hash>::print(std::ostream& os,
-                                             int indent) const {
+template <typename Hash, typename Meta>
+inline std::ostream& GhostCache<Hash, Meta>::print(std::ostream& os,
+                                                   int indent) const {
   os << "GhostCache (tick=" << tick << ", min=" << min_size
      << ", max=" << max_size << ", num_ticks=" << num_ticks
      << ", size=" << cache.size() << ") {\n";

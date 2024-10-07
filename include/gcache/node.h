@@ -33,7 +33,7 @@ class NodeTable;
 template <typename Key_t, typename Value_t, typename Hash>
 class LRUCache;
 
-template <typename Hash>
+template <typename Hash, typename Meta>
 class GhostCache;
 
 // LRUNodes forms a circular doubly linked list ordered by access time.
@@ -50,7 +50,7 @@ class LRUNode {
   template <typename K, typename V, typename H>
   friend class LRUCache;
 
-  template <typename H>
+  template <typename H, typename M>
   friend class GhostCache;
 
  public:
@@ -140,7 +140,7 @@ class LRUHandle : public BaseHandle<LRUNode<Key_t, Value_t>> {
   template <typename K, typename V, typename H>
   friend class LRUCache;
 
-  template <typename H>
+  template <typename H, typename M>
   friend class GhostCache;
 
  public:

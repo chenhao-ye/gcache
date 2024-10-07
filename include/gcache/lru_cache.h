@@ -73,6 +73,12 @@ class LRUCache {
   template <typename Fn>
   void for_each_in_use(Fn&& fn);
 
+  // Conditionally for_each APIs; if fn return false, stop iteration
+  template <typename Fn>
+  void for_each_until_lru(Fn&& fn);
+  template <typename Fn>
+  void for_each_until_mru(Fn&& fn);
+
   // Set pin to be true to pin the returned node so it won't be recycled by
   // LRU; a pinned node must be unpinned later by calling release().
 
@@ -289,6 +295,21 @@ template <typename Key_t, typename Value_t, typename Hash>
 template <typename Fn>
 inline void LRUCache<Key_t, Value_t, Hash>::for_each_in_use(Fn&& fn) {
   for (auto h = in_use_.next; h != &in_use_; h = h->next) fn(h);
+}
+
+template <typename Key_t, typename Value_t, typename Hash>
+template <typename Fn>
+inline void LRUCache<Key_t, Value_t, Hash>::for_each_until_lru(Fn&& fn) {
+  for (auto h = lru_.next; h != &lru_; h = h->next) {
+    if (!fn(h)) break;
+  }
+}
+
+template <typename Key_t, typename Value_t, typename Hash>
+template <typename Fn>
+inline void LRUCache<Key_t, Value_t, Hash>::for_each_until_mru(Fn&& fn) {
+  for (auto h = lru_.prev; h != &lru_; h = h->prev)
+    if (!fn(h)) break;
 }
 
 template <typename Key_t, typename Value_t, typename Hash>

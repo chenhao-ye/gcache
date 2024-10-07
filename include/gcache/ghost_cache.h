@@ -23,6 +23,9 @@ struct GhostMeta {
   uint32_t size_idx;
 };
 
+template <typename HashStr>
+class GhostKvCache;
+
 /**
  * Simulate a set of page cache, where each page only carry thin metadata
  * Templated type Meta must have a field size_idx; in almost all cases, this
@@ -49,6 +52,9 @@ class GhostCache {
   std::vector<CacheStat> caches_stat;
 
   Handle_t access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
+
+  template <typename H>
+  friend class GhostKvCache;
 
  public:
   GhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
@@ -94,18 +100,51 @@ class GhostCache {
     for (auto& s : caches_stat) s.reset();
   }
 
-  // For each item in the LRU list, call fn(key) in LRU order
+  // For each item in the LRU list, call fn in LRU order
   template <typename Fn>
   void for_each_lru(Fn&& fn) {
     cache.for_each_lru([&fn](Handle_t h) { fn(h.get_key()); });
   }
 
-  // For each item in the LRU list, call fn(key) in LRU order
+  // For each item in the LRU list, call fn in MRU order
   template <typename Fn>
   void for_each_mru(Fn&& fn) {
     cache.for_each_mru([&fn](Handle_t h) { fn(h.get_key()); });
   }
 
+  // For each item in the LRU list, call fn in LRU order until false
+  template <typename Fn>
+  void for_each_until_lru(Fn&& fn) {
+    cache.for_each_until_lru([&fn](Handle_t h) { fn(h.get_key()); });
+  }
+
+  // For each item in the LRU list, call fn in MRU order until false
+  template <typename Fn>
+  void for_each_until_mru(Fn&& fn) {
+    cache.for_each_until_mru([&fn](Handle_t h) { fn(h.get_key()); });
+  }
+
+ private:
+  // The for-each APIs below are unsafe because they expose the entire
+  // handle including size_idx; should only be called by friend classes
+  template <typename Fn>
+  void unsafe_for_each_lru(Fn&& fn) {
+    cache.for_each_lru(fn);
+  }
+  template <typename Fn>
+  void unsafe_for_each_mru(Fn&& fn) {
+    cache.for_each_mru(fn);
+  }
+  template <typename Fn>
+  void unsafe_for_each_until_lru(Fn&& fn) {
+    cache.for_each_until_lru(fn);
+  }
+  template <typename Fn>
+  void unsafe_for_each_until_mru(Fn&& fn) {
+    cache.for_each_until_mru(fn);
+  }
+
+ public:
   std::ostream& print(std::ostream& os, int indent = 0) const;
   friend std::ostream& operator<<(std::ostream& os, const GhostCache& c) {
     return c.print(os);

@@ -23,7 +23,7 @@ struct GhostMeta {
   uint32_t size_idx;
 };
 
-template <typename HashStr>
+template <typename Hash>
 class GhostKvCache;
 
 /**

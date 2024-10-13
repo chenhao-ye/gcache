@@ -1,6 +1,6 @@
 #pragma once
-#include <cassert>
 #include <cstdint>
+#include <string_view>
 
 #include "ghost_cache.h"
 
@@ -15,7 +15,7 @@ struct GhostKvMeta {
  * Simulate a key-value cache. It differs from GhostCache in that the key-value
  * pair can be variable-length.
  */
-template <typename HashStr = ghash_str>
+template <typename Hash = std::hash<std::string_view>>
 class GhostKvCache {
   GhostCache<idhash, GhostKvMeta> ghost_cache;
 
@@ -27,14 +27,9 @@ class GhostKvCache {
   GhostKvCache(uint32_t tick, uint32_t min_count, uint32_t max_count)
       : ghost_cache(tick, min_count, max_count) {}
 
-  void access(const std::string& key, uint32_t kv_size,
+  void access(const std::string_view key, uint32_t kv_size,
               AccessMode mode = AccessMode::DEFAULT) {
-    access(key.data(), key.size(), kv_size, mode);
-  }
-
-  void access(const char* key, size_t key_len, uint32_t kv_size,
-              AccessMode mode = AccessMode::DEFAULT) {
-    uint32_t key_hash = HashStr{}(key, key_len);
+    uint32_t key_hash = Hash{}(key);
     access(key_hash, kv_size, mode);
   }
 
@@ -79,7 +74,7 @@ class GhostKvCache {
         mrc.emplace_back(curr_count, curr_size, get_miss_rate(curr_count));
     });
     return mrc;
-    // should be implictly moved by compiler
+    // should be implicitly moved by compiler
     // avoid explict move for Return Value Optimization (RVO)
   }
 };

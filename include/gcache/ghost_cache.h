@@ -35,26 +35,29 @@ class GhostKvCache;
 template <typename Hash = ghash, typename Meta = GhostMeta>
 class GhostCache {
  protected:
-  uint32_t tick;
-  uint32_t min_size;
-  uint32_t max_size;
-  uint32_t num_ticks;
+  const uint32_t tick;
+  const uint32_t min_size;
+  const uint32_t max_size;
+  const uint32_t num_ticks;
 
   // Key is block_id/block number
   // Value is "size_idx", which is the least non-negative number such that the
   // key will in cache if the cache size is (size_idx * tick) + min_size
   LRUCache<uint32_t, Meta, Hash> cache;
 
+ public:
   using Handle_t = typename LRUCache<uint32_t, Meta, Hash>::Handle_t;
   using Node_t = typename LRUCache<uint32_t, Meta, Hash>::Node_t;
+
+ protected:
   // these must be placed after num_ticks to ensure a correct ctor order
   std::vector<Node_t*> boundaries;
   std::vector<CacheStat> caches_stat;
 
   Handle_t access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
 
-  template <typename H>
-  friend class GhostKvCache;
+  template <uint32_t S, typename H>
+  friend class SampledGhostKvCache;
 
  public:
   GhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
@@ -80,13 +83,6 @@ class GhostCache {
   [[nodiscard]] uint32_t get_min_size() const { return min_size; }
   [[nodiscard]] uint32_t get_max_size() const { return max_size; }
 
-  [[nodiscard]] double get_hit_rate(uint32_t cache_size) const {
-    return get_stat(cache_size).get_hit_rate();
-  }
-  [[nodiscard]] double get_miss_rate(uint32_t cache_size) const {
-    return get_stat(cache_size).get_miss_rate();
-  }
-
   [[nodiscard]] const CacheStat& get_stat(uint32_t cache_size) const {
     assert(cache_size >= min_size);
     assert(cache_size <= max_size);
@@ -94,6 +90,12 @@ class GhostCache {
     uint32_t size_idx = (cache_size - min_size) / tick;
     assert(size_idx < num_ticks);
     return caches_stat[size_idx];
+  }
+  [[nodiscard]] double get_hit_rate(uint32_t cache_size) const {
+    return get_stat(cache_size).get_hit_rate();
+  }
+  [[nodiscard]] double get_miss_rate(uint32_t cache_size) const {
+    return get_stat(cache_size).get_miss_rate();
   }
 
   void reset_stat() {
@@ -124,23 +126,23 @@ class GhostCache {
     cache.for_each_until_mru([&fn](Handle_t h) { fn(h.get_key()); });
   }
 
- private:
+ protected:
   // The for-each APIs below are unsafe because they expose the entire
   // handle including size_idx; should only be called by friend classes
   template <typename Fn>
-  void unsafe_for_each_lru(Fn&& fn) {
+  void unsafe_for_each_lru(Fn&& fn) const {
     cache.for_each_lru(fn);
   }
   template <typename Fn>
-  void unsafe_for_each_mru(Fn&& fn) {
+  void unsafe_for_each_mru(Fn&& fn) const {
     cache.for_each_mru(fn);
   }
   template <typename Fn>
-  void unsafe_for_each_until_lru(Fn&& fn) {
+  void unsafe_for_each_until_lru(Fn&& fn) const {
     cache.for_each_until_lru(fn);
   }
   template <typename Fn>
-  void unsafe_for_each_until_mru(Fn&& fn) {
+  void unsafe_for_each_until_mru(Fn&& fn) const {
     cache.for_each_until_mru(fn);
   }
 
@@ -176,25 +178,31 @@ class SampledGhostCache : public GhostCache<Hash, Meta> {
       this->access_impl(block_id, hash, mode);
   }
 
-  uint32_t get_tick() const { return this->tick << SampleShift; }
-  uint32_t get_min_size() const { return this->min_size << SampleShift; }
-  uint32_t get_max_size() const { return this->max_size << SampleShift; }
-
-  double get_hit_rate(uint32_t cache_size) const {
-    return get_stat(cache_size).get_hit_rate();
+  [[nodiscard]] uint32_t get_tick() const { return this->tick << SampleShift; }
+  [[nodiscard]] uint32_t get_min_size() const {
+    return this->min_size << SampleShift;
   }
-  double get_miss_rate(uint32_t cache_size) const {
-    return get_stat(cache_size).get_miss_rate();
+  [[nodiscard]] uint32_t get_max_size() const {
+    return this->max_size << SampleShift;
   }
 
-  const CacheStat& get_stat(uint32_t cache_size) const {
-    cache_size >>= SampleShift;
-    assert(cache_size >= this->min_size);
-    assert(cache_size <= this->max_size);
-    assert((cache_size - this->min_size) % this->tick == 0);
-    uint32_t size_idx = (cache_size - this->min_size) / this->tick;
-    assert(size_idx < this->num_ticks);
-    return this->caches_stat[size_idx];
+  [[nodiscard]] const CacheStat& get_stat(uint32_t cache_size) const {
+    return get_stat_shifted(cache_size >> SampleShift);
+  }
+  [[nodiscard]] double get_hit_rate(uint32_t cache_size) const {
+    return this->get_stat(cache_size).get_hit_rate();
+  }
+  [[nodiscard]] double get_miss_rate(uint32_t cache_size) const {
+    return this->get_stat(cache_size).get_miss_rate();
+  }
+
+ protected:
+  template <uint32_t S, typename H>
+  friend class SampledGhostKvCache;
+
+  [[nodiscard]] const CacheStat& get_stat_shifted(
+      uint32_t cache_size_shifted) const {
+    return GhostCache<Hash, Meta>::get_stat(cache_size_shifted);
   }
 };
 

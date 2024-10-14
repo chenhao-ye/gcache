@@ -13,18 +13,21 @@ struct GhostKvMeta {
 
 /**
  * Simulate a key-value cache. It differs from GhostCache in that the key-value
- * pair can be variable-length.
+ * pair can be variable-length. By default support sampling (non-sampling
+ * version can be acquired by setting SampleShift=0)
  */
-template <typename Hash = std::hash<std::string_view>>
-class GhostKvCache {
-  GhostCache<idhash, GhostKvMeta> ghost_cache;
+template <uint32_t SampleShift = 5, typename Hash = std::hash<std::string_view>>
+class SampledGhostKvCache {
+  SampledGhostCache<SampleShift, idhash, GhostKvMeta> ghost_cache;
 
  public:
-  using Handle_t = typename GhostCache<idhash, GhostKvMeta>::Handle_t;
-  using Node_t = typename GhostCache<idhash, GhostKvMeta>::Node_t;
+  using Handle_t =
+      typename SampledGhostCache<SampleShift, idhash, GhostKvMeta>::Handle_t;
+  using Node_t =
+      typename SampledGhostCache<SampleShift, idhash, GhostKvMeta>::Node_t;
 
  public:
-  GhostKvCache(uint32_t tick, uint32_t min_count, uint32_t max_count)
+  SampledGhostKvCache(uint32_t tick, uint32_t min_count, uint32_t max_count)
       : ghost_cache(tick, min_count, max_count) {}
 
   void access(const std::string_view key, uint32_t kv_size,
@@ -36,7 +39,7 @@ class GhostKvCache {
   void access(uint32_t key_hash, uint32_t kv_size,
               AccessMode mode = AccessMode::DEFAULT) {
     // only with certain number of leading zeros is sampled
-    if (key_hash >> (32 - this->SampleShift)) return;
+    if (key_hash >> (32 - SampleShift)) return;
     auto h = ghost_cache.access_impl(key_hash, key_hash, mode);
     h->kv_size = kv_size;
   }
@@ -59,19 +62,22 @@ class GhostKvCache {
     return ghost_cache.get_stat(count);
   }
 
+  void reset_stat() { ghost_cache.reset_stat(); }
+
   [[nodiscard]] const std::vector<
       std::tuple</*count*/ uint32_t, /*size*/ uint32_t, /*miss_rate*/ double>>
   get_miss_rate_curve() const {
-    uint32_t tick = get_tick();
-    uint32_t min_count = get_min_count();
     std::vector<std::tuple<uint32_t, uint32_t, double>> mrc;
     uint32_t curr_count = 0;
     uint32_t curr_size = 0;
     ghost_cache.unsafe_for_each_mru([&](Handle_t h) {
       curr_size += h->kv_size;
       ++curr_count;
-      if ((curr_count - min_count) % tick == 0)
-        mrc.emplace_back(curr_count, curr_size, get_miss_rate(curr_count));
+      if ((curr_count - ghost_cache.min_size) % ghost_cache.tick == 0) {
+        mrc.emplace_back(
+            curr_count << SampleShift, curr_size << SampleShift,
+            ghost_cache.get_stat_shifted(curr_count).get_miss_rate());
+      }
     });
     return mrc;
     // should be implicitly moved by compiler

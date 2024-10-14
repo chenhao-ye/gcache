@@ -39,13 +39,10 @@ struct CacheStat {
   std::ostream& print(std::ostream& os, int width = 0) const {
     uint64_t acc_cnt = hit_cnt + miss_cnt;
     if (acc_cnt == 0)
-      return os << "  NAN (" << std::setw(width) << std::fixed << hit_cnt
-                << '/' << std::setw(width) << std::fixed << acc_cnt << ')';
-    if (miss_cnt == 0)
-      os << " 100%";
-    else
-      os << std::setw(4) << std::fixed << std::setprecision(1)
-         << get_hit_rate() * 100 << '%';
+      return os << "  NAN (" << std::setw(width) << std::fixed << hit_cnt << '/'
+                << std::setw(width) << std::fixed << acc_cnt << ')';
+    os << std::setw(5) << std::fixed << std::setprecision(1)
+       << get_hit_rate() * 100 << '%';
     return os << " (" << std::setw(width) << std::fixed << hit_cnt << '/'
               << std::setw(width) << std::fixed << acc_cnt << ')';
   }

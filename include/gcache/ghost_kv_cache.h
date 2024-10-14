@@ -64,6 +64,30 @@ class SampledGhostKvCache {
 
   void reset_stat() { ghost_cache.reset_stat(); }
 
+  // For each item in the LRU list, call fn in LRU order
+  template <typename Fn>
+  void for_each_lru(Fn&& fn) const {
+    ghost_cache.for_each_lru(fn);
+  }
+
+  // For each item in the LRU list, call fn in MRU order
+  template <typename Fn>
+  void for_each_mru(Fn&& fn) const {
+    ghost_cache.for_each_mru(fn);
+  }
+
+  // For each item in the LRU list, call fn in LRU order until false
+  template <typename Fn>
+  void for_each_until_lru(Fn&& fn) const {
+    ghost_cache.for_each_until_lru(fn);
+  }
+
+  // For each item in the LRU list, call fn in MRU order until false
+  template <typename Fn>
+  void for_each_until_mru(Fn&& fn) const {
+    ghost_cache.for_each_until_mru(fn);
+  }
+
   [[nodiscard]] const std::vector<std::tuple<
       /*count*/ uint32_t, /*size*/ uint32_t, /*miss_rate*/ CacheStat>>
   get_cache_stat_curve() const {

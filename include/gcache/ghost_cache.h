@@ -104,25 +104,25 @@ class GhostCache {
 
   // For each item in the LRU list, call fn in LRU order
   template <typename Fn>
-  void for_each_lru(Fn&& fn) {
+  void for_each_lru(Fn&& fn) const {
     cache.for_each_lru([&fn](Handle_t h) { fn(h.get_key()); });
   }
 
   // For each item in the LRU list, call fn in MRU order
   template <typename Fn>
-  void for_each_mru(Fn&& fn) {
+  void for_each_mru(Fn&& fn) const {
     cache.for_each_mru([&fn](Handle_t h) { fn(h.get_key()); });
   }
 
   // For each item in the LRU list, call fn in LRU order until false
   template <typename Fn>
-  void for_each_until_lru(Fn&& fn) {
+  void for_each_until_lru(Fn&& fn) const {
     cache.for_each_until_lru([&fn](Handle_t h) { fn(h.get_key()); });
   }
 
   // For each item in the LRU list, call fn in MRU order until false
   template <typename Fn>
-  void for_each_until_mru(Fn&& fn) {
+  void for_each_until_mru(Fn&& fn) const {
     cache.for_each_until_mru([&fn](Handle_t h) { fn(h.get_key()); });
   }
 

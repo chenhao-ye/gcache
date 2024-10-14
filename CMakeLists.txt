@@ -26,12 +26,14 @@ set(SOURCE_FILES
 	include/gcache/lru_cache.h
 	include/gcache/stat.h
 	include/gcache/ghost_cache.h
+	include/gcache/ghost_kv_cache.h
 	include/gcache/shared_cache.h)
 
 include_directories(include)
 add_executable(gcache_test_lru ${SOURCE_FILES} tests/test_lru.cpp)
 add_executable(gcache_test_shared ${SOURCE_FILES} tests/test_shared.cpp)
 add_executable(gcache_test_ghost ${SOURCE_FILES} tests/test_ghost.cpp)
+add_executable(gcache_test_ghost_kv ${SOURCE_FILES} tests/test_ghost_kv.cpp)
 add_executable(gcache_bench_ghost ${SOURCE_FILES} benchmarks/bench_ghost.cpp)
 
 if(SAMPLE_SHIFT)
@@ -41,4 +43,5 @@ endif()
 add_test(NAME test_lru COMMAND gcache_test_lru)
 add_test(NAME test_shared COMMAND gcache_test_shared)
 add_test(NAME test_ghost COMMAND gcache_test_ghost)
+add_test(NAME test_ghost_kv COMMAND gcache_test_ghost_kv)
 add_test(NAME bench_ghost COMMAND gcache_bench_ghost)

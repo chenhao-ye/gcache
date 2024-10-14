@@ -61,20 +61,20 @@ void bench1() {
             << "-------------------------------------------------------------"
             << "-----------------------\n";
 
-  auto mrc = sampled_ghost_kv_cache.get_miss_rate_curve();
+  auto curve = sampled_ghost_kv_cache.get_cache_stat_curve();
   for (uint32_t s = tick; s <= bench_size; s += tick) {
     std::cout << std::setw(5) << s / 1024 << "K|";
     ghost_cache.get_stat(s).print(std::cout, 8);
     std::cout << '|';
     sampled_ghost_kv_cache.get_stat(s).print(std::cout, 8);
     std::cout << '|';
-    auto [count, size, miss_rate] = mrc[s / tick - 1];
+    auto [count, size, cache_stat] = curve[s / tick - 1];
     assert(count == s);
-    if (miss_rate == std::numeric_limits<double>::infinity()) {
+    if (cache_stat.hit_cnt == 0) {
       std::cout << "  NAN";
     } else {
       std::cout << std::setw(5) << std::fixed << std::setprecision(1)
-                << (1 - miss_rate) * 100 << '%';
+                << cache_stat.get_hit_rate() * 100 << '%';
     }
     std::cout << " @" << std::setw(7) << std::fixed << size / 1024 / 1024 << 'M'
               << std::setw(5) << std::fixed << size / count << std::endl;

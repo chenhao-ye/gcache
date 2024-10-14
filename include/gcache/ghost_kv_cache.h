@@ -64,22 +64,21 @@ class SampledGhostKvCache {
 
   void reset_stat() { ghost_cache.reset_stat(); }
 
-  [[nodiscard]] const std::vector<
-      std::tuple</*count*/ uint32_t, /*size*/ uint32_t, /*miss_rate*/ double>>
-  get_miss_rate_curve() const {
-    std::vector<std::tuple<uint32_t, uint32_t, double>> mrc;
+  [[nodiscard]] const std::vector<std::tuple<
+      /*count*/ uint32_t, /*size*/ uint32_t, /*miss_rate*/ CacheStat>>
+  get_cache_stat_curve() const {
+    std::vector<std::tuple<uint32_t, uint32_t, CacheStat>> curve;
     uint32_t curr_count = 0;
     uint32_t curr_size = 0;
     ghost_cache.unsafe_for_each_mru([&](Handle_t h) {
       curr_size += h->kv_size;
       ++curr_count;
       if ((curr_count - ghost_cache.min_size) % ghost_cache.tick == 0) {
-        mrc.emplace_back(
-            curr_count << SampleShift, curr_size << SampleShift,
-            ghost_cache.get_stat_shifted(curr_count).get_miss_rate());
+        curve.emplace_back(curr_count << SampleShift, curr_size << SampleShift,
+                           ghost_cache.get_stat_shifted(curr_count));
       }
     });
-    return mrc;
+    return curve;
     // should be implicitly moved by compiler
     // avoid explict move for Return Value Optimization (RVO)
   }

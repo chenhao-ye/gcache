@@ -54,10 +54,16 @@ class GhostCache {
   std::vector<Node_t*> boundaries;
   std::vector<CacheStat> caches_stat;
 
+  // the reused distances are formatted as a histogram
+  std::vector<uint32_t> reused_distances;  // converted to caches_stat lazily
+  uint32_t reused_count;  // count all access to reused_distances
+
   Handle_t access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
 
   template <uint32_t S, typename H>
   friend class SampledGhostKvCache;
+
+  void build_caches_stat();
 
  public:
   GhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
@@ -67,7 +73,9 @@ class GhostCache {
         num_ticks((max_size - min_size) / tick + 1),
         cache(),
         boundaries(num_ticks - 1, nullptr),
-        caches_stat(num_ticks) {
+        caches_stat(num_ticks),
+        reused_distances(num_ticks, 0),
+        reused_count(0) {
     assert(tick > 0);
     assert(min_size > 1);  // otherwise the first boundary will be LRU evicted
     assert(min_size + (num_ticks - 1) * tick == max_size);
@@ -83,23 +91,28 @@ class GhostCache {
   [[nodiscard]] uint32_t get_min_size() const { return min_size; }
   [[nodiscard]] uint32_t get_max_size() const { return max_size; }
 
-  [[nodiscard]] const CacheStat& get_stat(uint32_t cache_size) const {
+  [[nodiscard]] const CacheStat& get_stat(uint32_t cache_size) {
     assert(cache_size >= min_size);
     assert(cache_size <= max_size);
     assert((cache_size - min_size) % tick == 0);
     uint32_t size_idx = (cache_size - min_size) / tick;
     assert(size_idx < num_ticks);
-    return caches_stat[size_idx];
+    const CacheStat& stat = caches_stat[size_idx];
+    if (stat.hit_cnt + stat.miss_cnt != reused_count) build_caches_stat();
+    assert(stat.hit_cnt + stat.miss_cnt == reused_count);
+    return stat;
   }
-  [[nodiscard]] double get_hit_rate(uint32_t cache_size) const {
+  [[nodiscard]] double get_hit_rate(uint32_t cache_size) {
     return get_stat(cache_size).get_hit_rate();
   }
-  [[nodiscard]] double get_miss_rate(uint32_t cache_size) const {
+  [[nodiscard]] double get_miss_rate(uint32_t cache_size) {
     return get_stat(cache_size).get_miss_rate();
   }
 
   void reset_stat() {
-    for (auto& s : caches_stat) s.reset();
+    reused_count = 0;
+    for (size_t i = 0; i < reused_distances.size(); ++i)
+      reused_distances[i] = 0;
   }
 
   // For each item in the LRU list, call fn in LRU order
@@ -147,8 +160,8 @@ class GhostCache {
   }
 
  public:
-  std::ostream& print(std::ostream& os, int indent = 0) const;
-  friend std::ostream& operator<<(std::ostream& os, const GhostCache& c) {
+  std::ostream& print(std::ostream& os, int indent = 0);
+  friend std::ostream& operator<<(std::ostream& os, GhostCache& c) {
     return c.print(os);
   }
 };
@@ -186,13 +199,13 @@ class SampledGhostCache : public GhostCache<Hash, Meta> {
     return this->max_size << SampleShift;
   }
 
-  [[nodiscard]] const CacheStat& get_stat(uint32_t cache_size) const {
+  [[nodiscard]] const CacheStat& get_stat(uint32_t cache_size) {
     return get_stat_shifted(cache_size >> SampleShift);
   }
-  [[nodiscard]] double get_hit_rate(uint32_t cache_size) const {
+  [[nodiscard]] double get_hit_rate(uint32_t cache_size) {
     return this->get_stat(cache_size).get_hit_rate();
   }
-  [[nodiscard]] double get_miss_rate(uint32_t cache_size) const {
+  [[nodiscard]] double get_miss_rate(uint32_t cache_size) {
     return this->get_stat(cache_size).get_miss_rate();
   }
 
@@ -200,8 +213,7 @@ class SampledGhostCache : public GhostCache<Hash, Meta> {
   template <uint32_t S, typename H>
   friend class SampledGhostKvCache;
 
-  [[nodiscard]] const CacheStat& get_stat_shifted(
-      uint32_t cache_size_shifted) const {
+  [[nodiscard]] const CacheStat& get_stat_shifted(uint32_t cache_size_shifted) {
     return GhostCache<Hash, Meta>::get_stat(cache_size_shifted);
   }
 };
@@ -270,19 +282,16 @@ GhostCache<Hash, Meta>::access_impl(uint32_t block_id, uint32_t hash,
 
   switch (mode) {
     case AccessMode::DEFAULT:
-      if (s) {
-        for (uint32_t i = 0; i < size_idx; ++i) caches_stat[i].add_miss();
-        for (uint32_t i = size_idx; i < num_ticks; ++i)
-          caches_stat[i].add_hit();
-      } else {
-        for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_miss();
-      }
+      // if no successor,it must be a miss for all cache sizes
+      if (s) ++reused_distances[size_idx];
+      ++reused_count;
       break;
     case AccessMode::AS_MISS:
-      for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_miss();
+      ++reused_count;
       break;
     case AccessMode::AS_HIT:
-      for (uint32_t i = 0; i < num_ticks; ++i) caches_stat[i].add_hit();
+      ++reused_distances[0];
+      ++reused_count;
       break;
     case AccessMode::NOOP:
       break;
@@ -291,8 +300,19 @@ GhostCache<Hash, Meta>::access_impl(uint32_t block_id, uint32_t hash,
 }
 
 template <typename Hash, typename Meta>
+inline void GhostCache<Hash, Meta>::build_caches_stat() {
+  uint32_t accum_hit_cnt = 0;
+  for (size_t idx = 0; idx < caches_stat.size(); ++idx) {
+    accum_hit_cnt += reused_distances[idx];
+    caches_stat[idx].hit_cnt = accum_hit_cnt;
+    caches_stat[idx].miss_cnt = reused_count - accum_hit_cnt;
+  }
+}
+
+template <typename Hash, typename Meta>
 inline std::ostream& GhostCache<Hash, Meta>::print(std::ostream& os,
-                                                   int indent) const {
+                                                   int indent) {
+  build_caches_stat();
   os << "GhostCache (tick=" << tick << ", min=" << min_size
      << ", max=" << max_size << ", num_ticks=" << num_ticks
      << ", size=" << cache.size() << ") {\n";

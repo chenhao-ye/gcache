@@ -160,7 +160,7 @@ class GhostCache {
 
  public:
   std::ostream& print(std::ostream& os, int indent = 0);
-  friend std::ostream& operator<<(std::ostream& os, const GhostCache& c) {
+  friend std::ostream& operator<<(std::ostream& os, GhostCache& c) {
     return c.print(os);
   }
 };

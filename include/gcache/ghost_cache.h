@@ -55,8 +55,8 @@ class GhostCache {
   std::vector<CacheStat> caches_stat;
 
   // the reused distances are formatted as a histogram
-  std::vector<uint32_t> reused_distances;  // converted to caches_stat lazily
-  uint32_t reused_count;  // count all access to reused_distances
+  std::vector<uint32_t> reuse_distances;  // converted to caches_stat lazily
+  uint32_t reuse_count;                   // count all access to reuse_distances
 
   Handle_t access_impl(uint32_t block_id, uint32_t hash, AccessMode mode);
 
@@ -74,8 +74,8 @@ class GhostCache {
         cache(),
         boundaries(num_ticks - 1, nullptr),
         caches_stat(num_ticks),
-        reused_distances(num_ticks, 0),
-        reused_count(0) {
+        reuse_distances(num_ticks, 0),
+        reuse_count(0) {
     assert(tick > 0);
     assert(min_size > 1);  // otherwise the first boundary will be LRU evicted
     assert(min_size + (num_ticks - 1) * tick == max_size);
@@ -98,8 +98,8 @@ class GhostCache {
     uint32_t size_idx = (cache_size - min_size) / tick;
     assert(size_idx < num_ticks);
     const CacheStat& stat = caches_stat[size_idx];
-    if (stat.hit_cnt + stat.miss_cnt != reused_count) build_caches_stat();
-    assert(stat.hit_cnt + stat.miss_cnt == reused_count);
+    if (stat.hit_cnt + stat.miss_cnt != reuse_count) build_caches_stat();
+    assert(stat.hit_cnt + stat.miss_cnt == reuse_count);
     return stat;
   }
   [[nodiscard]] double get_hit_rate(uint32_t cache_size) {
@@ -110,9 +110,8 @@ class GhostCache {
   }
 
   void reset_stat() {
-    reused_count = 0;
-    for (size_t i = 0; i < reused_distances.size(); ++i)
-      reused_distances[i] = 0;
+    reuse_count = 0;
+    for (size_t i = 0; i < reuse_distances.size(); ++i) reuse_distances[i] = 0;
   }
 
   // For each item in the LRU list, call fn in LRU order
@@ -161,7 +160,7 @@ class GhostCache {
 
  public:
   std::ostream& print(std::ostream& os, int indent = 0);
-  friend std::ostream& operator<<(std::ostream& os, GhostCache& c) {
+  friend std::ostream& operator<<(std::ostream& os, const GhostCache& c) {
     return c.print(os);
   }
 };
@@ -283,15 +282,15 @@ GhostCache<Hash, Meta>::access_impl(uint32_t block_id, uint32_t hash,
   switch (mode) {
     case AccessMode::DEFAULT:
       // if no successor,it must be a miss for all cache sizes
-      if (s) ++reused_distances[size_idx];
-      ++reused_count;
+      if (s) ++reuse_distances[size_idx];
+      ++reuse_count;
       break;
     case AccessMode::AS_MISS:
-      ++reused_count;
+      ++reuse_count;
       break;
     case AccessMode::AS_HIT:
-      ++reused_distances[0];
-      ++reused_count;
+      ++reuse_distances[0];
+      ++reuse_count;
       break;
     case AccessMode::NOOP:
       break;
@@ -303,9 +302,9 @@ template <typename Hash, typename Meta>
 inline void GhostCache<Hash, Meta>::build_caches_stat() {
   uint32_t accum_hit_cnt = 0;
   for (size_t idx = 0; idx < caches_stat.size(); ++idx) {
-    accum_hit_cnt += reused_distances[idx];
+    accum_hit_cnt += reuse_distances[idx];
     caches_stat[idx].hit_cnt = accum_hit_cnt;
-    caches_stat[idx].miss_cnt = reused_count - accum_hit_cnt;
+    caches_stat[idx].miss_cnt = reuse_count - accum_hit_cnt;
   }
 }
 

@@ -52,13 +52,13 @@ class SampledGhostKvCache {
   [[nodiscard]] uint32_t get_max_count() const {
     return ghost_cache.get_max_size();
   }
-  [[nodiscard]] double get_hit_rate(uint32_t count) const {
+  [[nodiscard]] double get_hit_rate(uint32_t count) {
     return ghost_cache.get_hit_rate(count);
   }
-  [[nodiscard]] double get_miss_rate(uint32_t count) const {
+  [[nodiscard]] double get_miss_rate(uint32_t count) {
     return ghost_cache.get_miss_rate(count);
   }
-  [[nodiscard]] const CacheStat& get_stat(uint32_t count) const {
+  [[nodiscard]] const CacheStat& get_stat(uint32_t count) {
     return ghost_cache.get_stat(count);
   }
 
@@ -90,7 +90,7 @@ class SampledGhostKvCache {
 
   [[nodiscard]] const std::vector<std::tuple<
       /*count*/ uint32_t, /*size*/ uint32_t, /*miss_rate*/ CacheStat>>
-  get_cache_stat_curve() const {
+  get_cache_stat_curve() {
     std::vector<std::tuple<uint32_t, uint32_t, CacheStat>> curve;
     uint32_t curr_count = 0;
     uint32_t curr_size = 0;

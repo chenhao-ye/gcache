@@ -101,7 +101,8 @@ class SampledGhostKvCache {
     ghost_cache.unsafe_for_each_mru([&](Handle_t h) {
       curr_size += h->kv_size;
       ++curr_count;
-      if ((curr_count - ghost_cache.min_size) % ghost_cache.tick == 0) {
+      if (curr_count >= ghost_cache.min_size &&
+          (curr_count - ghost_cache.min_size) % ghost_cache.tick == 0) {
         curve.emplace_back(curr_count << SampleShift, curr_size << SampleShift,
                            ghost_cache.get_stat_shifted(curr_count));
       }

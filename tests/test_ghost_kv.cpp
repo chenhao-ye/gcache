@@ -3,7 +3,6 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
-#include <limits>
 #include <string>
 
 #include "gcache/ghost_kv_cache.h"
@@ -68,19 +67,24 @@ void bench1() {
     std::cout << '|';
     sampled_ghost_kv_cache.get_stat(s).print(std::cout, 8);
     std::cout << '|';
-    auto [count, size, cache_stat] = curve[s / tick - 1];
-    assert(count == s);
-    if (cache_stat.hit_cnt == 0) {
-      std::cout << "  NAN";
-    } else {
-      std::cout << std::setw(5) << std::fixed << std::setprecision(1)
-                << cache_stat.get_hit_rate() * 100 << '%';
+    auto idx = s / tick - 1;
+    if (idx < curve.size()) {
+      auto [count, size, cache_stat] = curve[idx];
+      assert(count == s);
+      if (cache_stat.hit_cnt == 0) {
+        std::cout << "  NAN";
+      } else {
+        std::cout << std::setw(5) << std::fixed << std::setprecision(1)
+                  << cache_stat.get_hit_rate() * 100 << '%';
+      }
+      std::cout << " @" << std::setw(7) << std::fixed << size / 1024 / 1024
+                << 'M' << std::setw(5) << std::fixed << size / count;
     }
-    std::cout << " @" << std::setw(7) << std::fixed << size / 1024 / 1024 << 'M'
-              << std::setw(5) << std::fixed << size / count << std::endl;
+    std::cout << std::endl;
   }
   std::cout << "=============================================================="
             << "======================\n";
   std::cout << std::endl;
 }
+
 int main() { bench1(); }

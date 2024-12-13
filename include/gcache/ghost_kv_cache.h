@@ -28,7 +28,9 @@ class SampledGhostKvCache {
 
  public:
   SampledGhostKvCache(uint32_t tick, uint32_t min_count, uint32_t max_count)
-      : ghost_cache(tick, min_count, max_count) {}
+      : ghost_cache(tick, min_count, max_count) {
+    static_assert(SampleShift <= 32, "SampleShift must be no larger than 32");
+  }
 
   void access(const std::string_view key, uint32_t kv_size,
               AccessMode mode = AccessMode::DEFAULT) {
@@ -39,7 +41,9 @@ class SampledGhostKvCache {
   void access(uint32_t key_hash, uint32_t kv_size,
               AccessMode mode = AccessMode::DEFAULT) {
     // only with certain number of leading zeros is sampled
-    if (key_hash >> (32 - SampleShift)) return;
+    if constexpr (SampleShift > 0) {
+      if (key_hash >> (32 - SampleShift)) return;
+    }
     auto h = ghost_cache.access_impl(key_hash, key_hash, mode);
     h->kv_size = kv_size;
   }

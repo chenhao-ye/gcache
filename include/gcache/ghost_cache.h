@@ -173,6 +173,7 @@ class SampledGhostCache : public GhostCache<Hash, Meta> {
   SampledGhostCache(uint32_t tick, uint32_t min_size, uint32_t max_size)
       : GhostCache<Hash, Meta>(tick >> SampleShift, min_size >> SampleShift,
                                max_size >> SampleShift) {
+    static_assert(SampleShift <= 32, "SampleShift must be no larger than 32");
     assert(tick % (1 << SampleShift) == 0);
     assert(min_size % (1 << SampleShift) == 0);
     assert(max_size % (1 << SampleShift) == 0);
@@ -186,8 +187,10 @@ class SampledGhostCache : public GhostCache<Hash, Meta> {
   // Only update ghost cache if the first few bits of hash is all zero
   void access(uint32_t block_id, AccessMode mode = AccessMode::DEFAULT) {
     uint32_t hash = Hash{}(block_id);
-    if ((hash >> (32 - SampleShift)) == 0)
-      this->access_impl(block_id, hash, mode);
+    if constexpr (SampleShift > 0) {
+      if (hash >> (32 - SampleShift)) return;
+    }
+    this->access_impl(block_id, hash, mode);
   }
 
   [[nodiscard]] uint32_t get_tick() const { return this->tick << SampleShift; }

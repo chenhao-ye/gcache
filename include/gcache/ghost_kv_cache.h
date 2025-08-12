@@ -35,7 +35,7 @@ class SampledGhostKvCache {
  public:
   SampledGhostKvCache(SizeType tick, SizeType min_count, SizeType max_count)
       : ghost_cache(tick, min_count, max_count) {
-    static_assert(SampleShift <= 32, "SampleShift must be no larger than 32");
+    static_assert(SampleShift <= std::numeric_limits<SizeType>::digits);
   }
 
   void access(const std::string_view key, SizeType kv_size,
@@ -48,7 +48,8 @@ class SampledGhostKvCache {
               AccessMode mode = AccessMode::DEFAULT) {
     // only with certain number of leading zeros is sampled
     if constexpr (SampleShift > 0) {
-      if (key_hash >> (32 - SampleShift)) return;
+      if (key_hash >> (std::numeric_limits<SizeType>::digits - SampleShift))
+        return;
     }
     auto h = ghost_cache.access_impl(key_hash, key_hash, mode);
     h->kv_size = kv_size;
@@ -106,7 +107,7 @@ class SampledGhostKvCache {
     std::vector<std::tuple<SizeType, size_t, CacheStat>> curve;
     SizeType curr_count = 0;
     size_t curr_size = 0;
-    ghost_cache.unsafe_for_each_mru([&](Handle_t h) {
+    ghost_cache.for_each_mru([&](const Handle_t h) {
       curr_size += h->kv_size;
       ++curr_count;
       if (curr_count >= ghost_cache.min_size &&

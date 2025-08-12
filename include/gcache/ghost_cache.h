@@ -121,45 +121,25 @@ class GhostCache {
   // For each item in the LRU list, call fn in LRU order
   template <typename Fn>
   void for_each_lru(Fn&& fn) const {
-    cache.for_each_lru([&fn](Handle_t h) { fn(h.get_key()); });
+    cache.for_each_lru([&fn](const Handle_t h) { fn(h); });
   }
 
   // For each item in the LRU list, call fn in MRU order
   template <typename Fn>
   void for_each_mru(Fn&& fn) const {
-    cache.for_each_mru([&fn](Handle_t h) { fn(h.get_key()); });
+    cache.for_each_mru([&fn](const Handle_t h) { fn(h); });
   }
 
   // For each item in the LRU list, call fn in LRU order until false
   template <typename Fn>
   void for_each_until_lru(Fn&& fn) const {
-    cache.for_each_until_lru([&fn](Handle_t h) { fn(h.get_key()); });
+    cache.for_each_until_lru([&fn](const Handle_t h) { fn(h); });
   }
 
   // For each item in the LRU list, call fn in MRU order until false
   template <typename Fn>
   void for_each_until_mru(Fn&& fn) const {
-    cache.for_each_until_mru([&fn](Handle_t h) { fn(h.get_key()); });
-  }
-
- protected:
-  // The for-each APIs below are unsafe because they expose the entire
-  // handle including size_idx; should only be called by friend classes
-  template <typename Fn>
-  void unsafe_for_each_lru(Fn&& fn) const {
-    cache.for_each_lru(fn);
-  }
-  template <typename Fn>
-  void unsafe_for_each_mru(Fn&& fn) const {
-    cache.for_each_mru(fn);
-  }
-  template <typename Fn>
-  void unsafe_for_each_until_lru(Fn&& fn) const {
-    cache.for_each_until_lru(fn);
-  }
-  template <typename Fn>
-  void unsafe_for_each_until_mru(Fn&& fn) const {
-    cache.for_each_until_mru(fn);
+    cache.for_each_until_mru([&fn](const Handle_t h) { fn(h); });
   }
 
  public:

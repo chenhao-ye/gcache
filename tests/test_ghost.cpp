@@ -134,7 +134,8 @@ void test3() {
             << std::endl;
 
   std::vector<uint32_t> ckpt;
-  ghost_cache.for_each_lru([&ckpt](uint32_t key) { ckpt.emplace_back(key); });
+  ghost_cache.for_each_lru(
+      [&ckpt](GhostCache<>::Handle_t h) { ckpt.emplace_back(h.get_key()); });
 
   GhostCache<> ghost_cache2(3, 2, 11);
   for (auto key : ckpt) ghost_cache2.access(key, AccessMode::NOOP);

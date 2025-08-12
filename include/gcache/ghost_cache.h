@@ -59,8 +59,8 @@ class GhostCache {
   std::vector<CacheStat> caches_stat;
 
   // the reused distances are formatted as a histogram
-  std::vector<uint64_t> reuse_distances;  // converted to caches_stat lazily
-  uint64_t reuse_count;                   // count all access to reuse_distances
+  std::vector<size_t> reuse_distances;  // converted to caches_stat lazily
+  size_t reuse_count;                   // count all access to reuse_distances
 
   Handle_t access_impl(SizeType block_id, HashType hash, AccessMode mode);
 
@@ -312,7 +312,7 @@ GhostCache<Hash, Meta, SizeType, HashType>::access_impl(SizeType block_id,
 
 template <typename Hash, typename Meta, typename SizeType, typename HashType>
 inline void GhostCache<Hash, Meta, SizeType, HashType>::build_caches_stat() {
-  uint64_t accum_hit_cnt = 0;
+  size_t accum_hit_cnt = 0;
   for (size_t idx = 0; idx < caches_stat.size(); ++idx) {
     accum_hit_cnt += reuse_distances[idx];
     caches_stat[idx].hit_cnt = accum_hit_cnt;

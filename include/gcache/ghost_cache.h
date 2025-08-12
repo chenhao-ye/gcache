@@ -64,7 +64,7 @@ class GhostCache {
 
   Handle_t access_impl(SizeType block_id, HashType hash, AccessMode mode);
 
-  template <uint32_t S, typename H>
+  template <uint32_t S, typename H, typename ST, typename HT>
   friend class SampledGhostKvCache;
 
   void build_caches_stat();
@@ -219,7 +219,7 @@ class SampledGhostCache : public GhostCache<Hash, Meta, SizeType, HashType> {
   }
 
  protected:
-  template <uint32_t S, typename H>
+  template <uint32_t S, typename H, typename ST, typename HT>
   friend class SampledGhostKvCache;
 
   [[nodiscard]] const CacheStat& get_stat_shifted(SizeType cache_size_shifted) {

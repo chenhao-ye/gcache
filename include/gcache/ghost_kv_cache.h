@@ -98,8 +98,8 @@ class SampledGhostKvCache {
     ghost_cache.for_each_until_mru(fn);
   }
 
-  // the aggregated kv_size can easiler grow beyond 4 GB, so we use size_t
-  // instead of SizeType for that.
+  // Since the aggregated kv_size can easiler grow beyond 4 GB, we use size_t
+  // instead of SizeType for that
   [[nodiscard]] const std::vector<std::tuple<
       /*count*/ SizeType, /*size*/ size_t, /*miss_rate*/ CacheStat>>
   get_cache_stat_curve() {

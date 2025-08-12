@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <random>
 
 #include "gcache/ghost_cache.h"
 #include "gcache/node.h"
@@ -14,6 +15,9 @@ constexpr const uint32_t bench_size = 256 * 1024;             // 1 GB cache
 constexpr const uint32_t large_bench_size = 2 * 1024 * 1024;  // 8 GB cache
 
 constexpr const uint32_t sample_shift = 5;
+
+std::random_device rd;    // non-deterministic random device
+std::mt19937 urbg(rd());  // UniformRandomBitGenerator
 
 void test1() {
   std::cout << "=== Test 1 ===\n";
@@ -237,7 +241,7 @@ void bench3() {
   }
   ghost_cache.reset_stat();
   sampled_ghost_cache.reset_stat();
-  std::random_shuffle(reqs.begin(), reqs.end());
+  std::shuffle(reqs.begin(), reqs.end(), urbg);
 
   uint64_t elapse_g = 0;
   uint64_t elapse_s = 0;
@@ -245,7 +249,7 @@ void bench3() {
   for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
     for (auto j : reqs) ghost_cache.access(j);
     elapse_g += rdtsc() - ts0;
-    std::random_shuffle(reqs.begin(), reqs.end());
+    std::shuffle(reqs.begin(), reqs.end(), urbg);
     ts0 = rdtsc();
   }
 
@@ -253,7 +257,7 @@ void bench3() {
   for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
     for (auto j : reqs) sampled_ghost_cache.access(j);
     elapse_s += rdtsc() - ts0;
-    std::random_shuffle(reqs.begin(), reqs.end());
+    std::shuffle(reqs.begin(), reqs.end(), urbg);
     ts0 = rdtsc();
   }
 
@@ -292,7 +296,7 @@ void bench4() {
   }
   ghost_cache.reset_stat();
   sampled_ghost_cache.reset_stat();
-  std::random_shuffle(reqs.begin(), reqs.end());
+  std::shuffle(reqs.begin(), reqs.end(), urbg);
 
   uint64_t elapse_g = 0;
   uint64_t elapse_s = 0;
@@ -300,7 +304,7 @@ void bench4() {
   for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
     for (auto j : reqs) ghost_cache.access(j);
     elapse_g += rdtsc() - ts0;
-    std::random_shuffle(reqs.begin(), reqs.end());
+    std::shuffle(reqs.begin(), reqs.end(), urbg);
     ts0 = rdtsc();
   }
 
@@ -308,7 +312,7 @@ void bench4() {
   for (uint32_t i = 0; i < num_ops / reqs.size(); ++i) {
     for (auto j : reqs) sampled_ghost_cache.access(j);
     elapse_s += rdtsc() - ts0;
-    std::random_shuffle(reqs.begin(), reqs.end());
+    std::shuffle(reqs.begin(), reqs.end(), urbg);
     ts0 = rdtsc();
   }
 
@@ -349,7 +353,7 @@ void bench5() {
     reqs.emplace_back(rand() % large_bench_size);
   ghost_cache.reset_stat();
   sampled_ghost_cache.reset_stat();
-  std::random_shuffle(reqs.begin(), reqs.end());
+  std::shuffle(reqs.begin(), reqs.end(), urbg);
 
   uint64_t ts0;
   ts0 = rdtsc();

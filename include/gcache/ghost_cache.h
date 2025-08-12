@@ -19,8 +19,9 @@ enum AccessMode : uint8_t {
   NOOP,     // do not update
 };
 
+template <typename SizeType = uint32_t>
 struct GhostMeta {
-  uint32_t size_idx;
+  SizeType size_idx;
 };
 
 template <typename Hash>
@@ -34,14 +35,14 @@ class GhostKvCache;
  * To support cache size of differnet scales, we support templates numerical
  * type for cache size.
  */
-template <typename Hash = ghash, typename Meta = GhostMeta,
+template <typename Hash = ghash, typename Meta = GhostMeta<uint32_t>,
           typename SizeType = uint32_t, typename HashType = uint32_t>
 class GhostCache {
  protected:
-  const uint32_t tick;
-  const uint32_t min_size;
-  const uint32_t max_size;
-  const uint32_t num_ticks;
+  const SizeType tick;
+  const SizeType min_size;
+  const SizeType max_size;
+  const SizeType num_ticks;
 
   // Key is block_id/block number
   // Value is "size_idx", which is the least non-negative number such that the
@@ -49,8 +50,8 @@ class GhostCache {
   LRUCache<SizeType, Meta, Hash> cache;
 
  public:
-  using Handle_t = typename LRUCache<uint32_t, Meta, Hash>::Handle_t;
-  using Node_t = typename LRUCache<uint32_t, Meta, Hash>::Node_t;
+  using Handle_t = typename LRUCache<SizeType, Meta, Hash>::Handle_t;
+  using Node_t = typename LRUCache<SizeType, Meta, Hash>::Node_t;
 
  protected:
   // these must be placed after num_ticks to ensure a correct ctor order
@@ -98,7 +99,7 @@ class GhostCache {
     assert(cache_size >= min_size);
     assert(cache_size <= max_size);
     assert((cache_size - min_size) % tick == 0);
-    uint32_t size_idx = (cache_size - min_size) / tick;
+    SizeType size_idx = (cache_size - min_size) / tick;
     assert(size_idx < num_ticks);
     const CacheStat& stat = caches_stat[size_idx];
     if (stat.hit_cnt + stat.miss_cnt != reuse_count) build_caches_stat();
@@ -170,7 +171,7 @@ class GhostCache {
 
 // only sample 1/32 (~3.125%)
 template <uint32_t SampleShift = 5, typename Hash = ghash,
-          typename Meta = GhostMeta, typename SizeType = uint32_t,
+          typename Meta = GhostMeta<uint32_t>, typename SizeType = uint32_t,
           typename HashType = uint32_t>
 class SampledGhostCache : public GhostCache<Hash, Meta, SizeType, HashType> {
  public:
@@ -178,14 +179,15 @@ class SampledGhostCache : public GhostCache<Hash, Meta, SizeType, HashType> {
       : GhostCache<Hash, Meta, SizeType, HashType>(tick >> SampleShift,
                                                    min_size >> SampleShift,
                                                    max_size >> SampleShift) {
-    static_assert(SampleShift <= 32, "SampleShift must be no larger than 32");
-    assert(tick % (1 << SampleShift) == 0);
-    assert(min_size % (1 << SampleShift) == 0);
-    assert(max_size % (1 << SampleShift) == 0);
+    static_assert(SampleShift <= std::numeric_limits<SizeType>::digits);
+    assert((tick >> SampleShift) << SampleShift == tick);
+    assert((min_size >> SampleShift) << SampleShift == min_size);
+    assert((max_size >> SampleShift) << SampleShift == max_size);
     // Left few bits used for sampling; right few used for hash.
     // Make sure they never overlap.
-    assert(std::countr_zero<uint32_t>(std::bit_ceil<uint32_t>(max_size)) <=
-           32 - static_cast<int>(SampleShift));
+    assert(std::countr_zero<SizeType>(std::bit_ceil<SizeType>(max_size)) <=
+           std::numeric_limits<SizeType>::digits -
+               static_cast<int>(SampleShift));
     assert(this->tick > 0);
   }
 
@@ -193,7 +195,7 @@ class SampledGhostCache : public GhostCache<Hash, Meta, SizeType, HashType> {
   void access(SizeType block_id, AccessMode mode = AccessMode::DEFAULT) {
     HashType hash = Hash{}(block_id);
     if constexpr (SampleShift > 0) {
-      if (hash >> (32 - SampleShift)) return;
+      if (hash >> (std::numeric_limits<HashType>::digits - SampleShift)) return;
     }
     this->access_impl(block_id, hash, mode);
   }
@@ -264,7 +266,7 @@ GhostCache<Hash, Meta, SizeType, HashType>::access_impl(SizeType block_id,
    * 2) X's size_idx should be set to 0.
    * 3) if X itself is a boundary, set that boundary to X's next (sucessor).
    */
-  uint32_t size_idx;
+  SizeType size_idx;
   if (s) {  // No new insertion
     size_idx = h->size_idx;
     if (size_idx < num_ticks - 1 && boundaries[size_idx] == h.node)
@@ -281,7 +283,7 @@ GhostCache<Hash, Meta, SizeType, HashType>::access_impl(SizeType block_id,
     if (size_idx < num_ticks - 1 && cache.size() == size_idx * tick + min_size)
       boundaries[size_idx] = cache.lru_.next;
   }
-  for (uint32_t i = 0; i < size_idx; ++i) {
+  for (SizeType i = 0; i < size_idx; ++i) {
     auto& b = boundaries[i];
     if (!b) continue;
     b->value.size_idx++;
@@ -310,7 +312,7 @@ GhostCache<Hash, Meta, SizeType, HashType>::access_impl(SizeType block_id,
 
 template <typename Hash, typename Meta, typename SizeType, typename HashType>
 inline void GhostCache<Hash, Meta, SizeType, HashType>::build_caches_stat() {
-  uint32_t accum_hit_cnt = 0;
+  uint64_t accum_hit_cnt = 0;
   for (size_t idx = 0; idx < caches_stat.size(); ++idx) {
     accum_hit_cnt += reuse_distances[idx];
     caches_stat[idx].hit_cnt = accum_hit_cnt;
@@ -332,7 +334,7 @@ inline std::ostream& GhostCache<Hash, Meta, SizeType, HashType>::print(
     os << boundaries[0]->key;
   else
     os << "(null)";
-  for (uint32_t i = 1; i < boundaries.size(); ++i) {
+  for (size_t i = 1; i < boundaries.size(); ++i) {
     os << ", ";
     if (boundaries[i])
       os << boundaries[i]->key;
@@ -342,7 +344,7 @@ inline std::ostream& GhostCache<Hash, Meta, SizeType, HashType>::print(
   os << "]\n";
   for (int i = 0; i < indent + 1; ++i) os << '\t';
   os << "Stat:       [" << min_size << ": " << caches_stat[0];
-  for (uint32_t i = 1; i < num_ticks; ++i)
+  for (size_t i = 1; i < num_ticks; ++i)
     os << ", " << min_size + i * tick << ": " << caches_stat[i];
   os << "]\n";
   for (int i = 0; i < indent + 1; ++i) os << '\t';

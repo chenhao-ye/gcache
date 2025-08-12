@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 
+#include "gcache/ghost_cache.h"
 #include "gcache/ghost_kv_cache.h"
 #include "gcache/node.h"
 #include "util.h"
@@ -30,11 +31,10 @@ void bench1() {
   std::vector<uint32_t> reqs;
   std::vector<std::pair<uint32_t, std::string>> reqs2;
   for (uint32_t i = 0; i < bench_size; ++i) {
-    ghost_cache.access(i);
-    sampled_ghost_kv_cache.access(make_key(i), i > bench_size / 4 ? 500 : 2000);
+    ghost_cache.access(i, AccessMode::NOOP);
+    sampled_ghost_kv_cache.access(make_key(i), i > bench_size / 4 ? 500 : 2000,
+                                  AccessMode::NOOP);
   }
-  ghost_cache.reset_stat();
-  sampled_ghost_kv_cache.reset_stat();
 
   for (uint32_t i = 0; i < num_ops; ++i) reqs.emplace_back(rand() % bench_size);
   std::random_shuffle(reqs.begin(), reqs.end());
@@ -53,12 +53,12 @@ void bench1() {
   std::cout << "=== Bench 1 ===\n";
   std::cout << "w/o sampling: " << elapse_g / num_ops << " cycles/op\n";
   std::cout << "w/ sampling:  " << elapse_s / num_ops << " cycles/op\n";
-  std::cout << "========================= Hit Rate ==========================="
-            << "======================\n"
-            << " size |       w/o sampling       |        w/ sampling       |"
-            << "        kv memoy       \n"
-            << "-------------------------------------------------------------"
-            << "-----------------------\n";
+  std::cout << "==================================== Hit Rate ==============="
+               "=======================\n"
+               " size |       w/o sampling       |        w/ sampling       |"
+               "        kv memoy       \n"
+               "-------------------------------------------------------------"
+               "-----------------------\n";
 
   auto curve = sampled_ghost_kv_cache.get_cache_stat_curve();
   for (uint32_t s = tick; s <= bench_size; s += tick) {

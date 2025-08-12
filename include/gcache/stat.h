@@ -1,14 +1,13 @@
 #pragma once
 
-#include <cstdint>
 #include <iomanip>
 #include <limits>
 
 namespace gcache {
 
 struct CacheStat {
-  uint64_t hit_cnt;
-  uint64_t miss_cnt;
+  size_t hit_cnt;
+  size_t miss_cnt;
 
  public:
   CacheStat() : hit_cnt(0), miss_cnt(0) {}
@@ -20,13 +19,13 @@ struct CacheStat {
   // e.g., hit_rate > 100%.
   // we don't use atomic here because we find it is too expensive.
   [[nodiscard]] double get_hit_rate() const {
-    uint64_t acc_cnt = hit_cnt + miss_cnt;
+    size_t acc_cnt = hit_cnt + miss_cnt;
     if (acc_cnt == 0) return std::numeric_limits<double>::infinity();
     return double(hit_cnt) / double(acc_cnt);
   }
 
   [[nodiscard]] double get_miss_rate() const {
-    uint64_t acc_cnt = hit_cnt + miss_cnt;
+    size_t acc_cnt = hit_cnt + miss_cnt;
     if (acc_cnt == 0) return std::numeric_limits<double>::infinity();
     return double(miss_cnt) / double(acc_cnt);
   }
@@ -37,7 +36,7 @@ struct CacheStat {
   }
 
   std::ostream& print(std::ostream& os, int width = 0) const {
-    uint64_t acc_cnt = hit_cnt + miss_cnt;
+    size_t acc_cnt = hit_cnt + miss_cnt;
     if (acc_cnt == 0)
       return os << "  NAN (" << std::setw(width) << std::fixed << hit_cnt << '/'
                 << std::setw(width) << std::fixed << acc_cnt << ')';

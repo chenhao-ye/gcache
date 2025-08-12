@@ -4,3 +4,4 @@ cmake-build-*
 .idea
 .clangd
 compile_commands.json
+.cache

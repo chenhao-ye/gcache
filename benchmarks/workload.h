@@ -82,19 +82,34 @@ struct Offsets {
   size_t num;
   BaseGenerator* gen;
 
-  struct EndIterator : std::iterator<std::input_iterator_tag, off_t> {
+  struct EndIterator {
+    using iterator_category = std::input_iterator_tag;
+    using value_type = off_t;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
+
     size_t num;
     explicit EndIterator(size_t num) : num(num) {}
   };
 
-  struct Iterator : std::iterator<std::input_iterator_tag, off_t> {
+  struct Iterator {
+    using iterator_category = std::input_iterator_tag;
+    using value_type = off_t;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
+
     BaseGenerator& gen;
     explicit Iterator(BaseGenerator& gen) : gen(gen) {}
+
     Iterator& operator++() {
       gen.next();
       return *this;
     }
-    off_t operator*() const { return gen.get(); }
+
+    value_type operator*() const { return gen.get(); }
+
     bool operator!=(const EndIterator& other) const {
       return gen.index < other.num;
     }

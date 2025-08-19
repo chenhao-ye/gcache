@@ -17,7 +17,7 @@ struct GhostKvMeta {
  * pair can be variable-length. By default support sampling (non-sampling
  * version can be acquired by setting SampleShift=0)
  */
-template <uint32_t SampleShift = 5, typename Hash = std::hash<std::string_view>,
+template <uint32_t SampleShift = 5, typename Hash = gshash,
           typename SizeType = uint32_t, typename HashType = uint32_t>
 class SampledGhostKvCache {
   SampledGhostCache<SampleShift, idhash, GhostKvMeta<SizeType>, SizeType,

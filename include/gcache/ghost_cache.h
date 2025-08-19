@@ -175,6 +175,7 @@ class SampledGhostCache : public GhostCache<Hash, Meta, SizeType, HashType> {
   void access(SizeType block_id, AccessMode mode = AccessMode::DEFAULT) {
     HashType hash = Hash{}(block_id);
     if constexpr (SampleShift > 0) {
+      // only sample blocks with certain number of leading zeros in hash
       if (hash >> (std::numeric_limits<HashType>::digits - SampleShift)) return;
     }
     this->access_impl(block_id, hash, mode);

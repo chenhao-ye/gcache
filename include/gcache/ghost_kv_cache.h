@@ -46,8 +46,8 @@ class SampledGhostKvCache {
 
   void access(HashType key_hash, SizeType kv_size,
               AccessMode mode = AccessMode::DEFAULT) {
-    // only with certain number of leading zeros is sampled
     if constexpr (SampleShift > 0) {
+      // only sample keys with certain number of leading zeros in hash
       if (key_hash >> (std::numeric_limits<SizeType>::digits - SampleShift))
         return;
     }
@@ -118,8 +118,11 @@ class SampledGhostKvCache {
     });
     // the last handle may not be at a tick, which can happen when the working
     // set is smaller than max_size; we need to manually add this tick
-    if ((curr_count > ghost_cache.min_size) &&
-        (curr_count - ghost_cache.min_size) % ghost_cache.tick != 0) {
+    if (curr_count < ghost_cache.min_size) {
+      auto next_count = ghost_cache.min_size;
+      curve.emplace_back(next_count << SampleShift, curr_size << SampleShift,
+                         ghost_cache.get_stat_shifted(next_count));
+    } else if ((curr_count - ghost_cache.min_size) % ghost_cache.tick != 0) {
       // round up to the next tick
       auto next_count = (curr_count + ghost_cache.tick - 1) / ghost_cache.tick *
                         ghost_cache.tick;

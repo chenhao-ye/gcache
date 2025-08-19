@@ -288,8 +288,8 @@ int main(int argc, char* argv[]) {
     max_err = *std::max_element(hit_rate_diff.begin(), hit_rate_diff.end());
   }
 
-  std::cout << "Avg Error: " << avg_err << std::endl;
-  std::cout << "Max Error: " << max_err << std::endl;
+  std::cout << "Avg Error: " << avg_err * 100 << "%" << std::endl;
+  std::cout << "Max Error: " << max_err * 100 << "%" << std::endl;
   ofs_perf << ',' << avg_err << ',' << max_err << std::endl;
 
   return 0;

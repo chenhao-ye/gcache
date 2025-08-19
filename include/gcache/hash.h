@@ -67,7 +67,7 @@ struct murmurhash {
 /* Hash for string_view */
 
 struct gshash {  // default string hash function for gcache
-  uint32_t operator()(std::string_view x) const noexcept {
+  uint32_t operator()(const std::string_view x) const noexcept {
     return crc32_u32(0x537, std::hash<std::string_view>{}(x));
   }
 };

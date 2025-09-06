@@ -131,7 +131,7 @@ class SampledGhostKvCache {
     }
     return curve;
     // should be implicitly moved by compiler
-    // avoid explict move for Return Value Optimization (RVO)
+    // avoid explicit move for Return Value Optimization (RVO)
   }
 };
 }  // namespace gcache

@@ -180,7 +180,7 @@ void bench1() {
   auto ts3 = rdtsc();
 
   for (uint32_t i = 0; i < bench_size / 8; ++i) {
-    // manually flatten the loop, becaues we cannot turn on compiler
+    // manually flatten the loop, because we cannot turn on compiler
     // optimization which will remove the whole loop since it produces nothing.
     gcache::ghash{}(i * 8);
     gcache::ghash{}(i * 8 + 1);
@@ -391,7 +391,7 @@ int main() {
   test3();   // test checkpoint and recover
   bench1();  // ghost cache w/o sampling
   bench2();  // ghost cache w/ sampling
-  bench3();  // hit rate comparsion
+  bench3();  // hit rate comparison
   bench4();  // large bench: may exceed CPU cache size
   bench5();  // real random access
   return 0;

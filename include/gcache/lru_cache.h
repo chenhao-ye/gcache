@@ -94,7 +94,7 @@ class LRUCache {
   void pin(Handle_t handle);
 
   /**
-   * The normal opeartions (`insert`/`lookup`/`release`) will only cause a node
+   * The normal operations (`insert`/`lookup`/`release`) will only cause a node
    * to flow among the lru list, the in-use list, and the free list.
    * Only `erase` will force a node to jump out of circulation, and only
    * `install` may add a node. When a node is erased, its value is trashed
@@ -196,7 +196,7 @@ class LRUCache {
   // This list is only maintained for memory efficiency purposes.
   Node_t erased_;
 
-  // Pool for additionaly allocated handles.
+  // Pool for additionally allocated handles.
   std::vector<Node_t*> extra_pool_;
 
   template <typename H, typename M, typename ST, typename HT>
@@ -242,7 +242,7 @@ inline LRUCache<Key_t, Value_t, Hash>::~LRUCache() {
     delete[] pool_;
     delete table_;
   }
-  /* `extrac_pool_` is always owned by this instance. */
+  /* `extra_pool_` is always owned by this instance. */
   for (auto e : extra_pool_) delete e;
 }
 

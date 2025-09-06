@@ -32,7 +32,7 @@ class GhostKvCache;
  * Templated type Meta must have a field size_idx; in almost all cases, this
  * field does not need to specified; it is only useful if there is some
  * additional per-page metadata to be carried.
- * To support cache size of differnet scales, we support templates numerical
+ * To support cache size of different scales, we support templates numerical
  * type for cache size.
  */
 template <typename Hash = ghash, typename Meta = GhostMeta<uint32_t>,
@@ -245,7 +245,7 @@ GhostCache<Hash, Meta, SizeType, HashType>::access_impl(SizeType block_id,
    * 1) every node at boundary with size_idx < X should increase its size_idx
    *    and the boundary pointer shall move to its next.
    * 2) X's size_idx should be set to 0.
-   * 3) if X itself is a boundary, set that boundary to X's next (sucessor).
+   * 3) if X itself is a boundary, set that boundary to X's next (successor).
    */
   SizeType size_idx;
   if (s) {  // No new insertion

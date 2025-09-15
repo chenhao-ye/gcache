@@ -10,6 +10,7 @@ template <typename SizeType = uint32_t>
 struct GhostKvMeta {
   SizeType size_idx;
   SizeType kv_size;
+  std::string key_str;
 };
 
 /**
@@ -40,10 +41,10 @@ class SampledGhostKvCache {
 
   void access(const std::string_view key, SizeType kv_size,
               AccessMode mode = AccessMode::DEFAULT) {
-    access(Hash{}(key), kv_size, mode);
+    access(Hash{}(key), key, kv_size, mode);
   }
 
-  void access(HashType key_hash, SizeType kv_size,
+  void access(HashType key_hash, const std::string_view key, SizeType kv_size,
               AccessMode mode = AccessMode::DEFAULT) {
     if constexpr (SampleShift > 0) {
       // only sample keys with certain number of leading zeros in hash
@@ -52,6 +53,7 @@ class SampledGhostKvCache {
     }
     auto h = ghost_cache.access_impl(key_hash, key_hash, mode);
     h->kv_size = kv_size;
+    h->key_str = key;
   }
 
   void update_size(const std::string_view key, SizeType kv_size) {

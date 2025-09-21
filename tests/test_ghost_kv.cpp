@@ -99,7 +99,113 @@ void bench1() {
     std::cout << std::endl;
   }
   std::cout << "=============================================================="
-            << "================================================" << std::endl;
+            << "================================================\n"
+            << std::endl;
 }
 
-int main() { bench1(); }
+void test_update_size() {
+  uint32_t tick = bench_size / 64;
+  SampledGhostKvCache<sample_shift> sampled_ghost_kv_cache(tick, tick,
+                                                           bench_size);
+  SampledGhostKvCache<sample_shift> sampled_ghost_kv_cache2(tick, tick,
+                                                            bench_size);
+
+  // filling the cache
+  for (uint32_t i = 0; i < bench_size; ++i) {
+    auto k = make_key(i);
+    sampled_ghost_kv_cache.access(k, i > bench_size / 4 ? 500 : 2000,
+                                  AccessMode::NOOP);
+    sampled_ghost_kv_cache2.access(k, i > bench_size / 4 ? 500 : 2000,
+                                   AccessMode::NOOP);
+  }
+
+  std::vector<uint32_t> reqs;
+  std::vector<std::pair<uint32_t, std::string>> reqs2;
+  for (uint32_t i = 0; i < num_ops; ++i) reqs.emplace_back(rand() % bench_size);
+  std::shuffle(reqs.begin(), reqs.end(), urbg);
+  for (auto i : reqs) reqs2.emplace_back(i, make_key(i));
+
+  for (const auto& [i, k] : reqs2) {
+    sampled_ghost_kv_cache.access(k, i > bench_size / 4 ? 500 : 2000);
+    sampled_ghost_kv_cache2.access(k, i > bench_size / 4 ? 500 : 2000);
+  }
+  std::shuffle(reqs2.begin(), reqs2.end(), urbg);
+  for (const auto& [i, k] : reqs2)
+    sampled_ghost_kv_cache2.update_size(k, (2000 * 1 + 500 * 3) / 4);
+
+  // Dump keys using for_each_lru and compare
+  std::vector<std::pair<uint32_t, uint32_t>> keys1, keys2;
+  sampled_ghost_kv_cache.for_each_lru(
+      [&keys1](const auto& h) { keys1.emplace_back(h.get_key(), h->kv_size); });
+  sampled_ghost_kv_cache2.for_each_lru(
+      [&keys2](const auto& h) { keys2.emplace_back(h.get_key(), h->kv_size); });
+
+  // Compare vectors
+  if (keys1.size() != keys2.size())
+    throw std::runtime_error("Key count mismatch");
+  for (size_t i = 0; i < keys1.size(); ++i) {
+    if (keys1[i].first != keys2[i].first) {
+      throw std::runtime_error(
+          "Key mismatch: lhs=" + std::to_string(keys1[i].first) +
+          ", rhs=" + std::to_string(keys2[i].first));
+    }
+  }
+
+  // Print comparison table
+  auto curve1 = sampled_ghost_kv_cache.get_cache_stat_curve();
+  auto curve2 = sampled_ghost_kv_cache2.get_cache_stat_curve();
+
+  std::cout << "=== Update Size Test ===\n"
+            << "==============================================================="
+               "==========================================\n"
+            << " size |       w/ kv sampling     |       kv memory     "
+               "|      w/ kv sample update |   updated kv memory  \n"
+            << "---------------------------------------------------------------"
+               "------------------------------------------\n";
+
+  for (uint32_t s = tick; s <= bench_size; s += tick) {
+    std::cout << std::setw(5) << s / 1024 << "K|";
+    sampled_ghost_kv_cache.get_stat(s).print(std::cout, 8);
+    std::cout << '|';
+
+    auto idx = s / tick - 1;
+    if (idx < curve1.size()) {
+      auto [count, size, cache_stat] = curve1[idx];
+      assert(count == s);
+      if (cache_stat.hit_cnt == 0) {
+        std::cout << "  NAN";
+      } else {
+        std::cout << std::setw(5) << std::fixed << std::setprecision(1)
+                  << cache_stat.get_hit_rate() * 100 << '%';
+      }
+      std::cout << " @" << std::setw(7) << std::fixed << size / 1024 / 1024
+                << 'M' << std::setw(5) << std::fixed << size / count;
+    }
+    std::cout << '|';
+
+    sampled_ghost_kv_cache2.get_stat(s).print(std::cout, 8);
+    std::cout << '|';
+
+    if (idx < curve2.size()) {
+      auto [count, size, cache_stat] = curve2[idx];
+      assert(count == s);
+      if (cache_stat.hit_cnt == 0) {
+        std::cout << "  NAN";
+      } else {
+        std::cout << std::setw(5) << std::fixed << std::setprecision(1)
+                  << cache_stat.get_hit_rate() * 100 << '%';
+      }
+      std::cout << " @" << std::setw(7) << std::fixed << size / 1024 / 1024
+                << 'M' << std::setw(5) << std::fixed << size / count;
+    }
+    std::cout << std::endl;
+  }
+  std::cout << "==============================================================="
+               "==========================================\n"
+            << std::endl;
+}
+
+int main() {
+  bench1();
+  test_update_size();
+}

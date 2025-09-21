@@ -136,6 +136,9 @@ class LRUCache {
   /* Below are intrusive functions that should only be called by GhostCache   */
   /****************************************************************************/
 
+  // Similar to lookup but won't refresh LRU.
+  Handle_t lookup_no_refresh(Key_t key, uint32_t hash);
+
   // Similar to insert but 1) the targeted node must be in LRU list and this
   // function never pins it, 2) return `successor`: the node with the same order
   // as the returned node after LRU operations (nullptr if newly inserted).
@@ -372,6 +375,12 @@ template <typename Key_t, typename Value_t, typename Hash>
 inline typename LRUCache<Key_t, Value_t, Hash>::Handle_t
 LRUCache<Key_t, Value_t, Hash>::lookup(Key_t key, bool pin) {
   return lookup_impl(key, Hash{}(key), pin);
+}
+
+template <typename Key_t, typename Value_t, typename Hash>
+inline typename LRUCache<Key_t, Value_t, Hash>::Handle_t
+LRUCache<Key_t, Value_t, Hash>::lookup_no_refresh(Key_t key, uint32_t hash) {
+  return table_->lookup(key, hash);
 }
 
 template <typename Key_t, typename Value_t, typename Hash>

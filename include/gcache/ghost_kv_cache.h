@@ -40,8 +40,7 @@ class SampledGhostKvCache {
 
   void access(const std::string_view key, SizeType kv_size,
               AccessMode mode = AccessMode::DEFAULT) {
-    HashType key_hash = Hash{}(key);
-    access(key_hash, kv_size, mode);
+    access(Hash{}(key), kv_size, mode);
   }
 
   void access(HashType key_hash, SizeType kv_size,
@@ -53,6 +52,20 @@ class SampledGhostKvCache {
     }
     auto h = ghost_cache.access_impl(key_hash, key_hash, mode);
     h->kv_size = kv_size;
+  }
+
+  void update_size(const std::string_view key, SizeType kv_size) {
+    update_size(Hash{}(key), kv_size);
+  }
+
+  void update_size(HashType key_hash, SizeType kv_size) {
+    if constexpr (SampleShift > 0) {
+      // only sample keys with certain number of leading zeros in hash
+      if (key_hash >> (std::numeric_limits<SizeType>::digits - SampleShift))
+        return;
+    }
+    auto h = ghost_cache.lookup_no_refresh(key_hash, key_hash);
+    if (h) h->kv_size = kv_size;
   }
 
   // for compatibility with GhostCache: APIs to query by keys count

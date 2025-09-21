@@ -64,6 +64,8 @@ class GhostCache {
 
   Handle_t access_impl(SizeType block_id, HashType hash, AccessMode mode);
 
+  Handle_t lookup_no_refresh(SizeType block_id, HashType hash);
+
   template <uint32_t S, typename H, typename ST, typename HT>
   friend class SampledGhostKvCache;
 
@@ -289,6 +291,13 @@ GhostCache<Hash, Meta, SizeType, HashType>::access_impl(SizeType block_id,
       break;
   }
   return h;
+}
+
+template <typename Hash, typename Meta, typename SizeType, typename HashType>
+inline typename GhostCache<Hash, Meta, SizeType, HashType>::Handle_t
+GhostCache<Hash, Meta, SizeType, HashType>::lookup_no_refresh(SizeType block_id,
+                                                              HashType hash) {
+  return cache.lookup_no_refresh(block_id, hash);
 }
 
 template <typename Hash, typename Meta, typename SizeType, typename HashType>
